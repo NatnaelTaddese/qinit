@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Outfit } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DialRoot } from "dialkit";
+import "dialkit/styles.css";
 import "./globals.css";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
@@ -37,6 +39,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <DialRoot position="top-right" />
         </ThemeProvider>
       </body>
     </html>

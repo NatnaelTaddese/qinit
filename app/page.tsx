@@ -1,59 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { PianoKeyboard } from "@/components/piano-keyboard";
+import { ScaleExplorer } from "@/components/scale-explorer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScaleType, RootNote } from "@/lib/scales";
+import { useAudio } from "@/hooks/use-audio";
+
+// MIDI note to frequency conversion
+function midiNoteToFrequency(note: number): number {
+  return 440 * Math.pow(2, (note - 69) / 12);
+}
 
 export default function Home() {
   const [isKeyboardCollapsed, setIsKeyboardCollapsed] = useState(false);
+  const [selectedScale, setSelectedScale] = useState<ScaleType | null>("tizita-major");
+  const [selectedRoot, setSelectedRoot] = useState<RootNote>("C#");
+  const [playbackNotes, setPlaybackNotes] = useState<Set<number>>(new Set());
+  
+  const { initAudio, playNote, stopNote } = useAudio();
+
+  const handleScaleChange = useCallback(
+    (scaleType: ScaleType | null, root: RootNote) => {
+      setSelectedScale(scaleType);
+      setSelectedRoot(root);
+    },
+    []
+  );
+
+  const handlePlayNote = useCallback(
+    (midi: number) => {
+      initAudio();
+      playNote(midiNoteToFrequency(midi), midi);
+      setPlaybackNotes((prev) => new Set([...prev, midi]));
+    },
+    [initAudio, playNote]
+  );
+
+  const handleStopNote = useCallback(
+    (midi: number) => {
+      stopNote(midi);
+      setPlaybackNotes((prev) => {
+        const next = new Set(prev);
+        next.delete(midi);
+        return next;
+      });
+    },
+    [stopNote]
+  );
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-gradient-to-b from-background via-background to-background/95">
       {/* Scrollable Content Area */}
       <ScrollArea
         className={
-          isKeyboardCollapsed ? "h-[calc(100vh-48px)]" : "h-[calc(100vh-320px)]"
+          isKeyboardCollapsed ? "h-[calc(100vh-48px)]" : "h-[calc(100vh-280px)]"
         }
       >
-        <main className="flex min-h-full flex-col items-center justify-start p-8">
-          <div className="w-full max-w-4xl">
-            <h1 className="mb-2 text-center text-3xl font-bold text-foreground">
-              Ethiopian Scale Learning Platform
-            </h1>
-            <p className="mb-8 text-center text-muted-foreground">
-              Learn and practice Ethiopian scales with MIDI or keyboard input
-            </p>
-
-            {/* Placeholder for future content */}
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-card p-8">
-                <h2 className="text-xl font-semibold mb-4">Welcome</h2>
-                <p className="text-muted-foreground">
-                  This platform will help you learn Ethiopian scales. Use the
-                  piano keyboard docked at the bottom to practice.
-                </p>
-                <p className="text-muted-foreground mt-2">
-                  You can play using your computer keyboard (keys shown on piano
-                  keys), click with your mouse, or connect a MIDI device.
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-border bg-card p-8">
-                <h2 className="text-xl font-semibold mb-4">Coming Soon</h2>
-                <ul className="space-y-2 text-muted-foreground">
-                  <li>• Ethiopian scale lessons</li>
-                  <li>• Interactive exercises</li>
-                  <li>• Progress tracking</li>
-                  <li>• Audio playback and recording</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+        <main className="flex min-h-full flex-col items-center justify-start p-8 pt-12">
+          <ScaleExplorer
+            onScaleChange={handleScaleChange}
+            onPlayNote={handlePlayNote}
+            onStopNote={handleStopNote}
+          />
         </main>
       </ScrollArea>
 
       {/* Fixed Piano Keyboard Dock */}
-      <PianoKeyboard onCollapseChange={setIsKeyboardCollapsed} />
+      <PianoKeyboard
+        selectedScale={selectedScale}
+        selectedRoot={selectedRoot}
+        playbackNotes={playbackNotes}
+        onCollapseChange={setIsKeyboardCollapsed}
+      />
     </div>
   );
 }
