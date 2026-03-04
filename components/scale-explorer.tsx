@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
   ScaleCategory,
   ScaleVariant,
   ScaleType,
   RootNote,
-  SCALE_CATEGORIES,
   SCALE_INFO,
   NATURAL_NOTES,
-  SHARP_NOTES,
   NOTES_WITH_SHARPS,
   getScaleType,
   hasVariants,
@@ -18,23 +16,25 @@ import {
   getScaleMidiNotes,
 } from "@/lib/scales";
 
+type TabType = "kinit" | ScaleCategory | "quiz";
+
 interface ScaleExplorerProps {
-  onScaleChange?: (scaleType: ScaleType | null, root: RootNote) => void;
+  activeTab: TabType;
+  variant: ScaleVariant;
+  selectedRoot: RootNote;
+  onRootChange: (root: RootNote) => void;
   onPlayNote?: (midi: number) => void;
   onStopNote?: (midi: number) => void;
 }
 
-type TabType = "kinit" | ScaleCategory | "quiz";
-
 export function ScaleExplorer({
-  onScaleChange,
+  activeTab,
+  variant,
+  selectedRoot,
+  onRootChange,
   onPlayNote,
   onStopNote,
 }: ScaleExplorerProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("tizita");
-  const [variant, setVariant] = useState<ScaleVariant>("major");
-  const [selectedRoot, setSelectedRoot] = useState<RootNote>("C#");
-
   // Get current scale type based on tab and variant
   const currentScaleType: ScaleType | null =
     activeTab === "kinit" || activeTab === "quiz"
@@ -45,35 +45,6 @@ export function ScaleExplorer({
   const scaleNotes = currentScaleType
     ? getScaleNotesWithDegrees(currentScaleType, selectedRoot)
     : [];
-
-  // Handle tab change
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    if (tab !== "kinit" && tab !== "quiz") {
-      const newScaleType = getScaleType(
-        tab,
-        hasVariants(tab) ? variant : null
-      );
-      onScaleChange?.(newScaleType, selectedRoot);
-    } else {
-      onScaleChange?.(null, selectedRoot);
-    }
-  };
-
-  // Handle variant change
-  const handleVariantChange = (newVariant: ScaleVariant) => {
-    setVariant(newVariant);
-    if (activeTab !== "kinit" && activeTab !== "quiz") {
-      const newScaleType = getScaleType(activeTab, newVariant);
-      onScaleChange?.(newScaleType, selectedRoot);
-    }
-  };
-
-  // Handle root change
-  const handleRootChange = (root: RootNote) => {
-    setSelectedRoot(root);
-    onScaleChange?.(currentScaleType, root);
-  };
 
   // Play scale
   const playScale = useCallback(
@@ -93,73 +64,11 @@ export function ScaleExplorer({
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
     },
-    [currentScaleType, selectedRoot, onPlayNote, onStopNote]
+    [currentScaleType, selectedRoot, onPlayNote, onStopNote],
   );
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
-      {/* Tab Navigation */}
-      <div className="flex justify-center">
-        <div className="inline-flex rounded-lg bg-muted/30 p-1 backdrop-blur-sm border border-white/5">
-          <TabButton
-            active={activeTab === "kinit"}
-            onClick={() => handleTabChange("kinit")}
-          >
-            Kiñit
-          </TabButton>
-          {SCALE_CATEGORIES.map((cat) => (
-            <TabButton
-              key={cat.id}
-              active={activeTab === cat.id}
-              onClick={() => handleTabChange(cat.id)}
-              color={
-                activeTab === cat.id
-                  ? SCALE_INFO[
-                      getScaleType(
-                        cat.id,
-                        hasVariants(cat.id) ? variant : null
-                      )
-                    ].color
-                  : undefined
-              }
-            >
-              {cat.label}
-            </TabButton>
-          ))}
-          <TabButton
-            active={activeTab === "quiz"}
-            onClick={() => handleTabChange("quiz")}
-          >
-            Quiz
-          </TabButton>
-        </div>
-      </div>
-
-      {/* Major/Minor Toggle - only show for scales with variants */}
-      {activeTab !== "kinit" &&
-        activeTab !== "quiz" &&
-        hasVariants(activeTab) && (
-          <div className="flex justify-center">
-            <div className="inline-flex rounded-lg bg-muted/20 p-1 border border-white/5">
-              <VariantButton
-                active={variant === "major"}
-                onClick={() => handleVariantChange("major")}
-                color={scaleInfo?.color}
-              >
-                Major
-              </VariantButton>
-              <VariantButton
-                active={variant === "minor"}
-                onClick={() => handleVariantChange("minor")}
-                color={scaleInfo?.color}
-              >
-                Minor
-              </VariantButton>
-            </div>
-          </div>
-        )}
-
-      {/* Scale Info Card */}
       {scaleInfo && (
         <div
           className="relative rounded-xl p-6 backdrop-blur-sm border"
@@ -194,7 +103,9 @@ export function ScaleExplorer({
                   {note}
                 </span>
               ))}
-              <span style={{ color: scaleInfo.color }}>{scaleNotes[0]?.note}</span>
+              <span style={{ color: scaleInfo.color }}>
+                {scaleNotes[0]?.note}
+              </span>
             </div>
           </div>
 
@@ -272,7 +183,7 @@ export function ScaleExplorer({
                   key={note}
                   note={note}
                   selected={selectedRoot === note}
-                  onClick={() => handleRootChange(note)}
+                  onClick={() => onRootChange(note)}
                   color={scaleInfo?.color}
                   partial={false}
                 />
@@ -297,7 +208,7 @@ export function ScaleExplorer({
                     key={sharpNote}
                     note={sharpNote}
                     selected={selectedRoot === sharpNote}
-                    onClick={() => handleRootChange(sharpNote)}
+                    onClick={() => onRootChange(sharpNote)}
                     color={scaleInfo?.color}
                     partial={false}
                   />
@@ -335,7 +246,7 @@ export function ScaleExplorer({
                   const midiNotes = getScaleMidiNotes(
                     currentScaleType!,
                     selectedRoot,
-                    4
+                    4,
                   );
                   onPlayNote?.(midiNotes[i]);
                 }}
@@ -343,7 +254,7 @@ export function ScaleExplorer({
                   const midiNotes = getScaleMidiNotes(
                     currentScaleType!,
                     selectedRoot,
-                    4
+                    4,
                   );
                   onStopNote?.(midiNotes[i]);
                 }}
@@ -359,7 +270,7 @@ export function ScaleExplorer({
                 const midiNotes = getScaleMidiNotes(
                   currentScaleType!,
                   selectedRoot,
-                  4
+                  4,
                 );
                 onPlayNote?.(midiNotes[0] + 12);
               }}
@@ -367,7 +278,7 @@ export function ScaleExplorer({
                 const midiNotes = getScaleMidiNotes(
                   currentScaleType!,
                   selectedRoot,
-                  4
+                  4,
                 );
                 onStopNote?.(midiNotes[0] + 12);
               }}
@@ -400,74 +311,6 @@ export function ScaleExplorer({
   );
 }
 
-// Tab Button Component
-function TabButton({
-  children,
-  active,
-  onClick,
-  color,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  color?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-4 py-2 text-sm font-medium rounded-md transition-all",
-        active
-          ? "text-white shadow-sm"
-          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-      )}
-      style={
-        active
-          ? {
-              backgroundColor: color || "hsl(var(--primary))",
-            }
-          : undefined
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-// Variant Button Component
-function VariantButton({
-  children,
-  active,
-  onClick,
-  color,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  color?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-5 py-2 text-sm font-medium rounded-md transition-all min-w-[100px]",
-        active
-          ? "text-white shadow-sm"
-          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-      )}
-      style={
-        active
-          ? {
-              backgroundColor: color || "hsl(var(--primary))",
-            }
-          : undefined
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
 // Root Note Button Component
 function RootNoteButton({
   note,
@@ -490,7 +333,7 @@ function RootNoteButton({
         selected
           ? "text-white border-transparent"
           : "text-muted-foreground border-white/10 hover:border-white/20 hover:bg-white/5",
-        partial && "opacity-50"
+        partial && "opacity-50",
       )}
       style={
         selected
@@ -525,7 +368,7 @@ function ScaleDegreeButton({
     <button
       className={cn(
         "flex flex-col items-center justify-center px-3 py-1.5 rounded-md transition-all",
-        "hover:bg-white/10 active:scale-95"
+        "hover:bg-white/10 active:scale-95",
       )}
       style={{
         backgroundColor: isRoot ? `${color}40` : `${color}20`,
@@ -565,7 +408,7 @@ function PlaybackButton({
         "w-9 h-9 rounded-md flex items-center justify-center transition-all",
         primary
           ? "bg-white/20 hover:bg-white/30 text-white"
-          : "bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+          : "bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground",
       )}
     >
       {icon}
