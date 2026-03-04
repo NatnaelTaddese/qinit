@@ -15,6 +15,7 @@ import {
   getScaleNotesWithDegrees,
   getScaleMidiNotes,
 } from "@/lib/scales";
+import { Quiz } from "./quiz";
 
 type TabType = "kinit" | ScaleCategory | "quiz";
 
@@ -25,6 +26,74 @@ interface ScaleExplorerProps {
   onRootChange: (root: RootNote) => void;
   onPlayNote?: (midi: number) => void;
   onStopNote?: (midi: number) => void;
+}
+
+// LCD Screen Component - mimics hardware synth/MPC displays
+function LCDScreen({
+  children,
+  className,
+  accentColor,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  accentColor?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden",
+        // Outer bezel - dark plastic frame with sharper corners
+        "rounded-[4px]",
+        "bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950",
+        "p-[3px]",
+        "shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]",
+        className
+      )}
+    >
+      {/* Inner bezel groove */}
+      <div className="rounded-[2px] bg-gradient-to-b from-zinc-950 to-zinc-900 p-[2px]">
+        {/* Screen surface */}
+        <div
+          className="relative rounded-[1px] p-4"
+          style={{
+            // LCD screen background - that classic blue-green or amber tint
+            background: accentColor
+              ? `linear-gradient(145deg, ${accentColor}08, ${accentColor}15, ${accentColor}05)`
+              : "linear-gradient(145deg, #0a1a18, #0f2520, #0a1815)",
+            // Subtle scanline effect
+            boxShadow: `
+              inset 0 0 60px rgba(0,0,0,0.3),
+              inset 0 1px 0 rgba(255,255,255,0.03),
+              inset 0 -1px 0 rgba(0,0,0,0.5)
+            `,
+          }}
+        >
+          {/* Scanline overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.03] rounded-[1px]"
+            style={{
+              backgroundImage: `repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.3) 2px,
+                rgba(0,0,0,0.3) 4px
+              )`,
+            }}
+          />
+          {/* Screen reflection */}
+          <div
+            className="absolute inset-0 pointer-events-none rounded-[1px]"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
+            }}
+          />
+          {/* Content */}
+          <div className="relative z-10">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ScaleExplorer({
@@ -70,185 +139,218 @@ export function ScaleExplorer({
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
       {scaleInfo && (
-        <div
-          className="relative rounded-xl p-6 backdrop-blur-sm border"
-          style={{
-            backgroundColor: `${scaleInfo.color}10`,
-            borderColor: `${scaleInfo.color}30`,
-          }}
-        >
-          {/* Scale Notes Badge */}
-          <div
-            className="absolute top-4 right-4 rounded-lg px-4 py-3 text-center"
-            style={{
-              backgroundColor: `${scaleInfo.color}20`,
-              borderColor: `${scaleInfo.color}40`,
-              border: "1px solid",
-            }}
-          >
-            <div
-              className="text-[10px] uppercase tracking-wider mb-1 opacity-70"
-              style={{ color: scaleInfo.color }}
-            >
-              {selectedRoot} {scaleInfo.name.split(" ")[0]}{" "}
-              {scaleInfo.variant || ""}
+        <LCDScreen accentColor={scaleInfo.color}>
+          {/* Header row */}
+          <div className="flex items-start justify-between mb-4">
+            {/* Scale Title */}
+            <div>
+              <div
+                className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-60 font-mono"
+                style={{ color: scaleInfo.color }}
+              >
+                Ethiopian Pentatonic · {scaleInfo.variant || "Unique"}
+              </div>
+              <h2
+                className="text-xl font-bold tracking-wide"
+                style={{ color: scaleInfo.color }}
+              >
+                {scaleInfo.name}
+              </h2>
             </div>
-            <div className="flex gap-2 text-sm font-medium">
-              {scaleNotes.map(({ note }, i) => (
-                <span
-                  key={i}
-                  className={cn(i === 0 && "font-bold")}
-                  style={{ color: i === 0 ? scaleInfo.color : "inherit" }}
-                >
-                  {note}
-                </span>
-              ))}
-              <span style={{ color: scaleInfo.color }}>
-                {scaleNotes[0]?.note}
-              </span>
-            </div>
-          </div>
 
-          {/* Scale Title */}
-          <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-            Ethiopian Pentatonic · {scaleInfo.variant || "Unique"} Variant
+            {/* Scale Notes Display */}
+            <div
+              className="rounded px-3 py-2 text-right font-mono"
+              style={{
+                backgroundColor: `${scaleInfo.color}15`,
+                border: `1px solid ${scaleInfo.color}30`,
+              }}
+            >
+              <div
+                className="text-[9px] uppercase tracking-wider mb-1 opacity-50"
+                style={{ color: scaleInfo.color }}
+              >
+                {selectedRoot} {scaleInfo.name.split(" ")[0]}
+              </div>
+              <div className="flex gap-1.5 text-sm font-medium">
+                {scaleNotes.map(({ note }, i) => (
+                  <span
+                    key={i}
+                    className={cn("transition-colors", i === 0 && "font-bold")}
+                    style={{ color: i === 0 ? scaleInfo.color : `${scaleInfo.color}99` }}
+                  >
+                    {note}
+                  </span>
+                ))}
+                <span className="opacity-50" style={{ color: scaleInfo.color }}>·</span>
+                <span style={{ color: scaleInfo.color }}>
+                  {scaleNotes[0]?.note}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Description */}
-          <p className="text-foreground text-lg leading-relaxed max-w-xl mb-4">
+          <p
+            className="text-sm leading-relaxed mb-3 opacity-90"
+            style={{ color: scaleInfo.color }}
+          >
             {scaleInfo.description}
           </p>
 
           {/* Cultural Context */}
-          <p className="text-muted-foreground leading-relaxed max-w-xl mb-4">
+          <p
+            className="text-sm leading-relaxed mb-4 opacity-60"
+            style={{ color: scaleInfo.color }}
+          >
             {scaleInfo.culturalContext}
           </p>
 
-          {/* Notable Artists */}
-          <div className="text-sm text-muted-foreground mb-3">
-            <span className="font-medium">Notable artists:</span>{" "}
-            {scaleInfo.notableArtists.join(" · ")}
+          {/* Bottom info row */}
+          <div
+            className="flex items-center justify-between pt-3 border-t text-xs font-mono"
+            style={{ borderColor: `${scaleInfo.color}20` }}
+          >
+            <div style={{ color: `${scaleInfo.color}80` }}>
+              <span className="opacity-60">ARTISTS:</span>{" "}
+              <span className="opacity-90">{scaleInfo.notableArtists.slice(0, 3).join(" · ")}</span>
+            </div>
+            <div style={{ color: `${scaleInfo.color}80` }}>
+              <span className="opacity-60">FORMULA:</span>{" "}
+              <span className="opacity-90">{scaleInfo.intervals}</span>
+            </div>
           </div>
-
-          {/* Formula */}
-          <div className="text-sm">
-            <span className="font-medium text-muted-foreground">Formula:</span>{" "}
-            <span className="text-foreground font-mono">
-              {scaleInfo.intervals}
-            </span>
-          </div>
-        </div>
+        </LCDScreen>
       )}
 
       {/* Kiñit Overview */}
       {activeTab === "kinit" && (
-        <div className="rounded-xl p-6 backdrop-blur-sm border border-white/10 bg-muted/10">
-          <h2 className="text-2xl font-bold mb-4">Ethiopian Kiñit Scales</h2>
-          <p className="text-muted-foreground leading-relaxed mb-4">
+        <LCDScreen>
+          <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-40 font-mono text-emerald-400">
+            System Overview
+          </div>
+          <h2 className="text-xl font-bold tracking-wide mb-4 text-emerald-400">
+            Ethiopian Kiñit Scales
+          </h2>
+          <p className="text-sm leading-relaxed mb-3 text-emerald-400/80">
             Kiñit (ቅኝት) refers to the system of modes or scales in Ethiopian
             music. Unlike Western music's major/minor dichotomy, Ethiopian music
             uses a rich palette of pentatonic scales, each with its own
             emotional character and cultural significance.
           </p>
-          <p className="text-muted-foreground leading-relaxed">
+          <p className="text-sm leading-relaxed text-emerald-400/60">
             Select a scale above to explore its unique intervals, cultural
             context, and notable artists who have mastered its expression.
           </p>
-        </div>
+        </LCDScreen>
       )}
 
-      {/* Quiz placeholder */}
+      {/* Quiz Mode */}
       {activeTab === "quiz" && (
-        <div className="rounded-xl p-6 backdrop-blur-sm border border-white/10 bg-muted/10 text-center">
-          <h2 className="text-2xl font-bold mb-4">Scale Quiz</h2>
-          <p className="text-muted-foreground">Coming soon...</p>
-        </div>
+        <Quiz onPlayNote={onPlayNote} onStopNote={onStopNote} />
       )}
 
       {/* Root Note Selector */}
       {activeTab !== "kinit" && activeTab !== "quiz" && (
-        <div className="space-y-3">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">
-            Select Root
-          </div>
-
-          {/* Natural Notes Row */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground w-14">
-              Natural
-            </span>
-            <div className="flex gap-1.5">
-              {NATURAL_NOTES.map((note) => (
-                <RootNoteButton
-                  key={note}
-                  note={note}
-                  selected={selectedRoot === note}
-                  onClick={() => onRootChange(note)}
-                  color={scaleInfo?.color}
-                  partial={false}
-                />
-              ))}
+        <LCDScreen accentColor={scaleInfo?.color} className="py-0">
+          <div className="flex items-center gap-4">
+            <div
+              className="text-[10px] uppercase tracking-[0.15em] font-mono opacity-60 shrink-0"
+              style={{ color: scaleInfo?.color || "#10b981" }}
+            >
+              Root
             </div>
-          </div>
 
-          {/* Sharp Notes Row */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground w-14">
-              Sharp
-            </span>
-            <div className="flex gap-1.5">
-              {NATURAL_NOTES.map((note) => {
-                const hasSharp = NOTES_WITH_SHARPS.includes(note);
-                const sharpNote = `${note}#` as RootNote;
-                if (!hasSharp) {
-                  return <div key={note} className="w-11 h-10" />;
-                }
-                return (
+            {/* Notes Grid */}
+            <div className="flex-1 space-y-2">
+              {/* Natural Notes Row */}
+              <div className="flex gap-1">
+                {NATURAL_NOTES.map((note) => (
                   <RootNoteButton
-                    key={sharpNote}
-                    note={sharpNote}
-                    selected={selectedRoot === sharpNote}
-                    onClick={() => onRootChange(sharpNote)}
+                    key={note}
+                    note={note}
+                    selected={selectedRoot === note}
+                    onClick={() => onRootChange(note)}
                     color={scaleInfo?.color}
-                    partial={false}
                   />
-                );
-              })}
-              <span className="text-[10px] text-muted-foreground ml-2">
-                * partial
-              </span>
+                ))}
+              </div>
+
+              {/* Sharp Notes Row */}
+              <div className="flex gap-1">
+                {NATURAL_NOTES.map((note) => {
+                  const hasSharp = NOTES_WITH_SHARPS.includes(note);
+                  const sharpNote = `${note}#` as RootNote;
+                  if (!hasSharp) {
+                    return <div key={note} className="w-10 h-8" />;
+                  }
+                  return (
+                    <RootNoteButton
+                      key={sharpNote}
+                      note={sharpNote}
+                      selected={selectedRoot === sharpNote}
+                      onClick={() => onRootChange(sharpNote)}
+                      color={scaleInfo?.color}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </LCDScreen>
       )}
 
       {/* Scale Degrees Display */}
       {scaleInfo && scaleNotes.length > 0 && (
-        <div
-          className="flex items-center gap-2 p-3 rounded-lg"
-          style={{ backgroundColor: `${scaleInfo.color}10` }}
-        >
-          <span
-            className="text-xs font-medium mr-2"
-            style={{ color: scaleInfo.color }}
-          >
-            {selectedRoot} {scaleInfo.name.split(" ")[0].toUpperCase()}
-          </span>
-          <div className="flex gap-1">
-            {scaleNotes.map(({ note, degree }, i) => (
+        <LCDScreen accentColor={scaleInfo.color} className="py-0">
+          <div className="flex items-center gap-3">
+            <div
+              className="text-[10px] uppercase tracking-[0.15em] font-mono opacity-60 shrink-0"
+              style={{ color: scaleInfo.color }}
+            >
+              Play
+            </div>
+
+            {/* Scale degree buttons */}
+            <div className="flex gap-1 flex-1">
+              {scaleNotes.map(({ note, degree }, i) => (
+                <ScaleDegreeButton
+                  key={i}
+                  note={note}
+                  label={degree.label}
+                  color={scaleInfo.color}
+                  isRoot={i === 0}
+                  onMouseDown={() => {
+                    const midiNotes = getScaleMidiNotes(
+                      currentScaleType!,
+                      selectedRoot,
+                      4,
+                    );
+                    onPlayNote?.(midiNotes[i]);
+                  }}
+                  onMouseUp={() => {
+                    const midiNotes = getScaleMidiNotes(
+                      currentScaleType!,
+                      selectedRoot,
+                      4,
+                    );
+                    onStopNote?.(midiNotes[i]);
+                  }}
+                />
+              ))}
+              {/* Octave */}
               <ScaleDegreeButton
-                key={i}
-                note={note}
-                label={degree.label}
+                note={scaleNotes[0].note}
+                label="8ve"
                 color={scaleInfo.color}
-                isRoot={i === 0}
+                isRoot={false}
                 onMouseDown={() => {
                   const midiNotes = getScaleMidiNotes(
                     currentScaleType!,
                     selectedRoot,
                     4,
                   );
-                  onPlayNote?.(midiNotes[i]);
+                  onPlayNote?.(midiNotes[0] + 12);
                 }}
                 onMouseUp={() => {
                   const midiNotes = getScaleMidiNotes(
@@ -256,99 +358,110 @@ export function ScaleExplorer({
                     selectedRoot,
                     4,
                   );
-                  onStopNote?.(midiNotes[i]);
+                  onStopNote?.(midiNotes[0] + 12);
                 }}
               />
-            ))}
-            {/* Octave */}
-            <ScaleDegreeButton
-              note={scaleNotes[0].note}
-              label="OCTAVE"
-              color={scaleInfo.color}
-              isRoot={false}
-              onMouseDown={() => {
-                const midiNotes = getScaleMidiNotes(
-                  currentScaleType!,
-                  selectedRoot,
-                  4,
-                );
-                onPlayNote?.(midiNotes[0] + 12);
-              }}
-              onMouseUp={() => {
-                const midiNotes = getScaleMidiNotes(
-                  currentScaleType!,
-                  selectedRoot,
-                  4,
-                );
-                onStopNote?.(midiNotes[0] + 12);
-              }}
-            />
-          </div>
+            </div>
 
-          {/* Playback Controls */}
-          <div className="flex gap-1 ml-auto">
-            <PlaybackButton
-              icon="↑"
-              title="Play ascending"
-              onClick={() => playScale("ascending")}
-            />
-            <PlaybackButton
-              icon="↓"
-              title="Play descending"
-              onClick={() => playScale("descending")}
-            />
-            <PlaybackButton icon="?" title="Quiz" onClick={() => {}} />
-            <PlaybackButton
-              icon="▶"
-              title="Play"
-              onClick={() => playScale("ascending")}
-              primary
-            />
+            {/* Playback Controls */}
+            <div className="flex gap-1 shrink-0">
+              <PlaybackButton
+                icon="↑"
+                title="Play ascending"
+                onClick={() => playScale("ascending")}
+                color={scaleInfo.color}
+              />
+              <PlaybackButton
+                icon="↓"
+                title="Play descending"
+                onClick={() => playScale("descending")}
+                color={scaleInfo.color}
+              />
+              <PlaybackButton
+                icon="▶"
+                title="Play"
+                onClick={() => playScale("ascending")}
+                color={scaleInfo.color}
+                primary
+              />
+            </div>
           </div>
-        </div>
+        </LCDScreen>
       )}
     </div>
   );
 }
 
-// Root Note Button Component
+// Root Note Button Component - MPC tactile rubber button style
 function RootNoteButton({
   note,
   selected,
   onClick,
   color,
-  partial,
 }: {
   note: RootNote;
   selected: boolean;
   onClick: () => void;
   color?: string;
-  partial: boolean;
 }) {
+  const displayColor = color || "#10b981";
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-11 h-10 rounded-md text-sm font-medium transition-all border",
+        "relative w-10 h-9 text-xs font-mono font-bold transition-all",
+        // Outer shell - the button housing
+        "rounded-[3px]",
+        // 3D tactile effect
         selected
-          ? "text-white border-transparent"
-          : "text-muted-foreground border-white/10 hover:border-white/20 hover:bg-white/5",
-        partial && "opacity-50",
+          ? "translate-y-[2px]" // Pressed down
+          : "hover:translate-y-[1px] active:translate-y-[2px]",
       )}
-      style={
-        selected
-          ? {
-              backgroundColor: color || "hsl(var(--primary))",
-            }
-          : undefined
-      }
+      style={{
+        // Button background - rubber/silicone look
+        background: selected
+          ? `linear-gradient(180deg, ${displayColor}90 0%, ${displayColor}70 100%)`
+          : `linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, #252525 100%)`,
+        // Border creates the edge/rim of the button
+        border: selected
+          ? `1px solid ${displayColor}`
+          : "1px solid #1a1a1a",
+        // Top highlight + bottom shadow for 3D depth
+        boxShadow: selected
+          ? `
+              inset 0 1px 0 ${displayColor}aa,
+              inset 0 -1px 2px rgba(0,0,0,0.4),
+              0 1px 2px rgba(0,0,0,0.5)
+            `
+          : `
+              inset 0 1px 0 rgba(255,255,255,0.08),
+              inset 0 -1px 2px rgba(0,0,0,0.3),
+              0 2px 4px rgba(0,0,0,0.5),
+              0 4px 6px rgba(0,0,0,0.3)
+            `,
+        color: selected ? "#fff" : "#888",
+        textShadow: selected ? `0 0 8px ${displayColor}` : "none",
+      }}
     >
-      {note}
+      {/* LED indicator dot */}
+      <div
+        className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full transition-all"
+        style={{
+          background: selected
+            ? `radial-gradient(circle at 30% 30%, ${displayColor}, ${displayColor}aa)`
+            : "radial-gradient(circle at 30% 30%, #444, #333)",
+          boxShadow: selected
+            ? `0 0 6px ${displayColor}, 0 0 10px ${displayColor}80`
+            : "inset 0 1px 2px rgba(0,0,0,0.5)",
+        }}
+      />
+      {/* Button label */}
+      <span className="relative z-10">{note}</span>
     </button>
   );
 }
 
-// Scale Degree Button Component
+// Scale Degree Button Component - MPC pad style
 function ScaleDegreeButton({
   note,
   label,
@@ -367,49 +480,89 @@ function ScaleDegreeButton({
   return (
     <button
       className={cn(
-        "flex flex-col items-center justify-center px-3 py-1.5 rounded-md transition-all",
-        "hover:bg-white/10 active:scale-95",
+        "relative flex flex-col items-center justify-center px-2.5 py-1.5 rounded-[3px] transition-all font-mono",
+        "active:translate-y-[2px]",
+        "hover:translate-y-[1px]",
       )}
       style={{
-        backgroundColor: isRoot ? `${color}40` : `${color}20`,
-        color: isRoot ? color : "inherit",
+        // Rubber pad look
+        background: isRoot
+          ? `linear-gradient(180deg, ${color}95 0%, ${color}75 100%)`
+          : `linear-gradient(180deg, ${color}50 0%, ${color}35 50%, ${color}30 100%)`,
+        border: `1px solid ${isRoot ? color : `${color}60`}`,
+        boxShadow: `
+          inset 0 1px 0 ${isRoot ? `${color}bb` : `${color}40`},
+          inset 0 -1px 2px rgba(0,0,0,0.3),
+          0 2px 4px rgba(0,0,0,0.4),
+          0 3px 6px rgba(0,0,0,0.2)
+        `,
+        color: isRoot ? "#fff" : color,
+        textShadow: isRoot ? `0 0 8px ${color}` : "none",
       }}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
-      <span className={cn("text-sm font-medium", isRoot && "font-bold")}>
+      <span className={cn("text-sm", isRoot && "font-bold")}>
         {note}
       </span>
-      <span className="text-[8px] uppercase tracking-wider opacity-70">
+      <span 
+        className="text-[7px] uppercase tracking-wider"
+        style={{ opacity: isRoot ? 0.8 : 0.6 }}
+      >
         {label}
       </span>
     </button>
   );
 }
 
-// Playback Button Component
+// Playback Button Component - MPC transport button style
 function PlaybackButton({
   icon,
   title,
   onClick,
+  color,
   primary,
 }: {
   icon: string;
   title: string;
   onClick: () => void;
+  color?: string;
   primary?: boolean;
 }) {
+  const displayColor = color || "#10b981";
   return (
     <button
       onClick={onClick}
       title={title}
       className={cn(
-        "w-9 h-9 rounded-md flex items-center justify-center transition-all",
-        primary
-          ? "bg-white/20 hover:bg-white/30 text-white"
-          : "bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground",
+        "relative w-8 h-8 rounded-[3px] flex items-center justify-center transition-all font-mono",
+        "hover:translate-y-[1px] active:translate-y-[2px]",
+        primary ? "text-sm" : "text-xs",
       )}
+      style={{
+        background: primary
+          ? `linear-gradient(180deg, ${displayColor}90 0%, ${displayColor}70 100%)`
+          : "linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, #252525 100%)",
+        border: primary
+          ? `1px solid ${displayColor}`
+          : "1px solid #1a1a1a",
+        boxShadow: primary
+          ? `
+              inset 0 1px 0 ${displayColor}aa,
+              inset 0 -1px 2px rgba(0,0,0,0.4),
+              0 2px 4px rgba(0,0,0,0.5),
+              0 3px 6px rgba(0,0,0,0.3)
+            `
+          : `
+              inset 0 1px 0 rgba(255,255,255,0.08),
+              inset 0 -1px 2px rgba(0,0,0,0.3),
+              0 2px 4px rgba(0,0,0,0.5),
+              0 3px 6px rgba(0,0,0,0.3)
+            `,
+        color: primary ? "#fff" : displayColor,
+        textShadow: primary ? `0 0 8px ${displayColor}` : "none",
+      }}
     >
       {icon}
     </button>

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Outfit } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { DialRoot } from "dialkit";
-import "dialkit/styles.css";
 import "./globals.css";
+import "dialkit/styles.css";
+import "./dialkit-overrides.css";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
 

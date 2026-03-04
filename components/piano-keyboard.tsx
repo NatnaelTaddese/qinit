@@ -400,16 +400,18 @@ function PianoKeyWhite({
   onMouseUp,
   onMouseLeave,
 }: PianoKeyProps) {
+  // Combine all "pressed" states - mouse active, keyboard active, or playback
+  const isPressedDown = isActive || isPressed;
+  
   return (
     <button
       className={cn(
         "group relative flex h-full w-full flex-col items-center justify-end rounded-b-[2px] border bg-gradient-to-b from-white via-white to-gray-50 pb-3 transition-all",
         "border-gray-300 border-b-[6px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1),inset_0_-2px_4px_rgba(0,0,0,0.05)]",
         "active:border-b-[2px] active:translate-y-[4px] active:shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(0,0,0,0.1)]",
-        // Pressed state (simulates :active for playback)
-        isPressed && "border-b-[2px] translate-y-[4px] shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(0,0,0,0.1)]",
-        isActive &&
-          "bg-gradient-to-b from-blue-50 via-blue-50 to-blue-100 border-blue-400 border-b-blue-500",
+        // Pressed state (for playback, mouse press, or keyboard press)
+        isPressedDown && "border-b-[2px] translate-y-[4px] shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(0,0,0,0.1)]",
+        // Ring indicator for keyboard input
         isKeyboardActive && "ring-2 ring-primary ring-inset",
       )}
       style={isInScale && scaleColor ? {
@@ -445,7 +447,7 @@ function PianoKeyWhite({
       <span
         className={cn(
           "text-xs font-medium text-gray-400",
-          isActive && "text-blue-600",
+          isPressedDown && "text-blue-600",
         )}
         style={isInScale && scaleColor ? { color: scaleColor } : undefined}
       >
@@ -455,7 +457,7 @@ function PianoKeyWhite({
         <span
           className={cn(
             "mt-1 text-[10px] uppercase text-gray-300",
-            isActive && "text-blue-400",
+            isPressedDown && "text-blue-400",
           )}
         >
           {config.keyboardKey}
@@ -480,6 +482,9 @@ function PianoKeyBlack({
 }: PianoKeyProps) {
   if (!config) return null;
 
+  // Combine all "pressed" states - mouse active, keyboard active, or playback
+  const isPressedDown = isActive || isPressed;
+
   return (
     <button
       className={cn(
@@ -487,10 +492,11 @@ function PianoKeyBlack({
         "border-gray-950 border-b-[5px] bg-gradient-to-b from-gray-700 via-gray-800 to-gray-900",
         "shadow-[0_6px_8px_-2px_rgba(0,0,0,0.4),0_4px_6px_-2px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)]",
         "active:border-b-[2px] active:translate-y-[3px] active:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(0,0,0,0.4)]",
-        // Pressed state (simulates :active for playback)
-        isPressed && "border-b-[2px] translate-y-[3px] shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(0,0,0,0.4)]",
-        isActive &&
+        // Pressed state (for playback, mouse press, or keyboard press)
+        isPressedDown && "border-b-[2px] translate-y-[3px] shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(0,0,0,0.4)]",
+        isPressedDown && !isInScale &&
           "bg-gradient-to-b from-blue-800 via-blue-900 to-blue-950 border-blue-950",
+        // Ring indicator for keyboard input
         isKeyboardActive && "ring-2 ring-primary ring-inset",
         isInScale && "backdrop-blur-sm",
       )}
@@ -535,7 +541,7 @@ function PianoKeyBlack({
       <span
         className={cn(
           "text-[10px] font-medium text-gray-500",
-          isActive && "text-blue-300",
+          isPressedDown && "text-blue-300",
           isInScale && "text-white",
         )}
       >
@@ -545,7 +551,7 @@ function PianoKeyBlack({
         <span
           className={cn(
             "mt-1 text-[8px] uppercase text-gray-600",
-            isActive && "text-blue-400",
+            isPressedDown && "text-blue-400",
             isInScale && "text-white/70",
           )}
         >

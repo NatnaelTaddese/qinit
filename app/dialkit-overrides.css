@@ -1,0 +1,298 @@
+/* ===== DialKit Panel Overrides - Piano Key Aesthetic ===== */
+/* This file is loaded AFTER dialkit/styles.css to ensure overrides work */
+
+/* Override DialKit CSS variables for piano-key style */
+.dialkit-root {
+  /* Surfaces - light piano key style */
+  --dial-surface: rgba(0, 0, 0, 0.04);
+  --dial-surface-hover: rgba(0, 0, 0, 0.08);
+  --dial-surface-active: rgba(0, 0, 0, 0.12);
+
+  /* Text hierarchy - dark text for light background */
+  --dial-text-root: #1f2937;
+  --dial-text-section: #4b5563;
+  --dial-text-label: #6b7280;
+  --dial-text-primary: #374151;
+  --dial-text-secondary: #6b7280;
+  --dial-text-tertiary: #9ca3af;
+
+  /* Borders - subtle gray */
+  --dial-border: #d1d5db;
+  --dial-border-hover: #9ca3af;
+
+  /* Panel background */
+  --dial-glass-bg: #f5f5f5;
+}
+
+/* Main panel container - piano key styling (expanded state only) */
+.dialkit-panel-inner:not([data-collapsed="true"]):not([data-collapsed=true]) {
+  background: linear-gradient(to bottom, white, #f8f8f8, #f0f0f0) !important;
+  border: 1px solid #d1d5db !important;
+  border-bottom: 5px solid #9ca3af !important;
+  border-radius: 0 0 6px 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), inset 0 -2px 4px rgba(0,0,0,0.05) !important;
+}
+
+/* Top highlight for depth on expanded panel */
+.dialkit-panel-inner:not([data-collapsed="true"]):not([data-collapsed=true])::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 0;
+}
+
+/* Panel header border */
+.dialkit-panel-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Folder title text */
+.dialkit-folder-title {
+  color: #4b5563 !important;
+}
+
+.dialkit-folder-title-root {
+  color: #1f2937 !important;
+}
+
+/* Folder dividers */
+.dialkit-folder {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.dialkit-folder:not(.dialkit-folder-root) {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Sliders - subtle light gray background */
+.dialkit-slider {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-slider:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Slider label and value text */
+.dialkit-slider-label {
+  color: #6b7280 !important;
+}
+
+.dialkit-slider-value {
+  color: #6b7280 !important;
+}
+
+.dialkit-slider-active .dialkit-slider-value {
+  color: #374151 !important;
+}
+
+/* Slider fill - subtle accent */
+.dialkit-slider-fill {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-slider-active .dialkit-slider-fill {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Slider handle */
+.dialkit-slider-handle {
+  background: #6b7280 !important;
+}
+
+/* Slider hashmarks */
+.dialkit-slider-active .dialkit-slider-hashmark {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Segmented controls - match navbar tabs */
+.dialkit-segmented {
+  background: transparent !important;
+}
+
+.dialkit-segmented-pill {
+  background: linear-gradient(to bottom, #f0f0f0, #e5e5e5) !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.05) !important;
+}
+
+.dialkit-segmented-button {
+  color: #6b7280 !important;
+}
+
+.dialkit-segmented-button[data-active="true"] {
+  color: #374151 !important;
+}
+
+/* Select triggers */
+.dialkit-select-trigger {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-select-trigger:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+.dialkit-select-trigger[data-open="true"] {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Select label and value */
+.dialkit-select-label,
+.dialkit-select-value {
+  color: #6b7280 !important;
+}
+
+/* Select dropdown - match panel style */
+.dialkit-select-dropdown {
+  background: linear-gradient(to bottom, white, #f8f8f8, #f0f0f0) !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.dialkit-select-option {
+  color: #6b7280 !important;
+}
+
+.dialkit-select-option:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+.dialkit-select-option[data-selected="true"] {
+  color: #374151 !important;
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Panel icon - darker for visibility on light bg */
+.dialkit-panel-icon {
+  color: #6b7280 !important;
+}
+
+/* Folder caret/chevron */
+.dialkit-folder-icon,
+.dialkit-select-chevron {
+  color: #9ca3af !important;
+}
+
+/* Labeled controls */
+.dialkit-labeled-control {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-labeled-control-label {
+  color: #6b7280 !important;
+}
+
+/* Toggle styling */
+.dialkit-toggle {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-toggle:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+.dialkit-toggle-label {
+  color: #6b7280 !important;
+}
+
+.dialkit-toggle-track {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+
+.dialkit-toggle[data-checked="true"] .dialkit-toggle-track {
+  background: #6b7280 !important;
+}
+
+.dialkit-toggle-thumb {
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+}
+
+/* Buttons */
+.dialkit-button,
+.dialkit-action-button {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #6b7280 !important;
+}
+
+.dialkit-button:hover,
+.dialkit-action-button:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #374151 !important;
+}
+
+/* Text/color controls */
+.dialkit-text-control,
+.dialkit-color-control {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-text-input,
+.dialkit-color-hex,
+.dialkit-color-hex-input {
+  color: #6b7280 !important;
+}
+
+.dialkit-text-input:focus,
+.dialkit-color-hex-input:focus {
+  color: #374151 !important;
+}
+
+/* Preset manager dropdown */
+.dialkit-preset-dropdown {
+  background: linear-gradient(to bottom, white, #f8f8f8, #f0f0f0) !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.dialkit-preset-item:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+.dialkit-preset-item[data-active="true"] {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-preset-name {
+  color: #6b7280 !important;
+}
+
+.dialkit-preset-item[data-active="true"] .dialkit-preset-name {
+  color: #374151 !important;
+}
+
+.dialkit-preset-delete svg {
+  color: #6b7280 !important;
+}
+
+.dialkit-preset-input {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #374151 !important;
+}
+
+.dialkit-preset-confirm {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.dialkit-preset-confirm:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+.dialkit-preset-confirm svg {
+  color: #6b7280 !important;
+}

@@ -181,3 +181,5 @@ svg.dialkit-panel-icon circle {
   right: auto !important;
   transform: none !important;
 }
+
+/* Note: Expanded panel styles are in dialkit-overrides.css which loads after dialkit/styles.css */
