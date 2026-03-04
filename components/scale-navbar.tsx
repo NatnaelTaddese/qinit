@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import {
   ScaleCategory,
@@ -32,61 +33,72 @@ export function ScaleNavbar({
   const scaleInfo = scaleType ? SCALE_INFO[scaleType] : null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-transparent  border-white/5">
-      <div className="flex flex-col items-center py-4 gap-4">
-        {/* Tab Navigation */}
-        <div className="inline-flex">
-          <TabButton
-            active={activeTab === "kinit"}
-            onClick={() => onTabChange("kinit")}
-          >
-            Kiñit
-          </TabButton>
-          {SCALE_CATEGORIES.map((cat) => (
-            <TabButton
-              key={cat.id}
-              active={activeTab === cat.id}
-              onClick={() => onTabChange(cat.id)}
-              color={
-                activeTab === cat.id
-                  ? SCALE_INFO[
-                      getScaleType(cat.id, hasVariants(cat.id) ? variant : null)
-                    ].color
-                  : undefined
-              }
-            >
-              {cat.label}
-            </TabButton>
-          ))}
-          <TabButton
-            active={activeTab === "quiz"}
-            onClick={() => onTabChange("quiz")}
-          >
-            Quiz
-          </TabButton>
+    <div className="fixed top-0 left-0 right-0 z-50 bg-transparent border-white/5">
+      <div className="flex items-start justify-between px-4 py-4">
+        {/* Logo on the left */}
+        <div className="flex-shrink-0">
+          <LogoButton />
         </div>
 
-        {/* Major/Minor Toggle - only show for scales with variants */}
-        {activeTab !== "kinit" &&
-          activeTab !== "quiz" &&
-          hasVariants(activeTab) && (
-            <div className="inline-flex">
-              <VariantButton
-                active={variant === "major"}
-                onClick={() => onVariantChange("major")}
-                color={scaleInfo?.color}
+        {/* Center content */}
+        <div className="flex flex-col items-center gap-4">
+          {/* Tab Navigation */}
+          <div className="inline-flex">
+            <TabButton
+              active={activeTab === "kinit"}
+              onClick={() => onTabChange("kinit")}
+            >
+              Kiñit
+            </TabButton>
+            {SCALE_CATEGORIES.map((cat) => (
+              <TabButton
+                key={cat.id}
+                active={activeTab === cat.id}
+                onClick={() => onTabChange(cat.id)}
+                color={
+                  activeTab === cat.id
+                    ? SCALE_INFO[
+                        getScaleType(cat.id, hasVariants(cat.id) ? variant : null)
+                      ].color
+                    : undefined
+                }
               >
-                Major
-              </VariantButton>
-              <VariantButton
-                active={variant === "minor"}
-                onClick={() => onVariantChange("minor")}
-                color={scaleInfo?.color}
-              >
-                Minor
-              </VariantButton>
-            </div>
-          )}
+                {cat.label}
+              </TabButton>
+            ))}
+            <TabButton
+              active={activeTab === "quiz"}
+              onClick={() => onTabChange("quiz")}
+            >
+              Quiz
+            </TabButton>
+          </div>
+
+          {/* Major/Minor Toggle - only show for scales with variants */}
+          {activeTab !== "kinit" &&
+            activeTab !== "quiz" &&
+            hasVariants(activeTab) && (
+              <div className="inline-flex">
+                <VariantButton
+                  active={variant === "major"}
+                  onClick={() => onVariantChange("major")}
+                  color={scaleInfo?.color}
+                >
+                  Major
+                </VariantButton>
+                <VariantButton
+                  active={variant === "minor"}
+                  onClick={() => onVariantChange("minor")}
+                  color={scaleInfo?.color}
+                >
+                  Minor
+                </VariantButton>
+              </div>
+            )}
+        </div>
+
+        {/* Spacer for symmetry */}
+        <div className="flex-shrink-0 w-[52px]" />
       </div>
     </div>
   );
@@ -209,3 +221,33 @@ function VariantButton({
 }
 
 export type { TabType };
+
+// Logo Button Component - White piano key style
+function LogoButton() {
+  return (
+    <button
+      className={cn(
+        "relative px-3 py-3 transition-all flex items-center justify-center",
+        "rounded-b-[3px]",
+        "border border-b-[5px]",
+        "active:border-b-[2px] active:translate-y-[3px] active:shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_2px_4px_rgba(0,0,0,0.1)]",
+      )}
+      style={{
+        background: `linear-gradient(to bottom, white, #f8f8f8, #f0f0f0)`,
+        borderColor: `#d1d5db`,
+        borderBottomColor: `#9ca3af`,
+        boxShadow: `0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), inset 0 -2px 4px rgba(0,0,0,0.05)`,
+      }}
+    >
+      {/* Top highlight for depth */}
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-white/80 rounded-t-[3px]" />
+      <Image
+        src="/felek-logo.svg"
+        alt="Felek Logo"
+        width={20}
+        height={20}
+        className="relative z-10"
+      />
+    </button>
+  );
+}
