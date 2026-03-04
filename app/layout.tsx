@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Outfit } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MobileDisclaimer } from "@/components/mobile-disclaimer";
 import { DialRoot } from "dialkit";
 import "./globals.css";
 import "dialkit/styles.css";
@@ -39,8 +40,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <MobileDisclaimer />
           {children}
-          <DialRoot position="top-right" />
+          <DialRoot position="top-right" defaultOpen={false} />
         </ThemeProvider>
       </body>
     </html>
