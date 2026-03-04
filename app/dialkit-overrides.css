@@ -47,6 +47,21 @@
   border-radius: 0;
 }
 
+/* LED indicator for expanded panel - active (green) */
+.dialkit-panel-inner:not([data-collapsed="true"]):not([data-collapsed=true])::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #4ade80, #22c55e);
+  box-shadow: 0 0 6px #22c55e, 0 0 10px rgba(34, 197, 94, 0.5);
+  pointer-events: none;
+  z-index: 10;
+}
+
 /* Panel header border */
 .dialkit-panel-header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
@@ -295,4 +310,316 @@
 
 .dialkit-preset-confirm svg {
   color: #6b7280 !important;
+}
+
+/* ===== Dark Mode Overrides ===== */
+.dark .dialkit-root {
+  /* Surfaces - dark background */
+  --dial-surface: rgba(255, 255, 255, 0.04);
+  --dial-surface-hover: rgba(255, 255, 255, 0.08);
+  --dial-surface-active: rgba(255, 255, 255, 0.12);
+
+  /* Text hierarchy - light text for dark background */
+  --dial-text-root: #f5f5f5;
+  --dial-text-section: #d4d4d4;
+  --dial-text-label: #a3a3a3;
+  --dial-text-primary: #e5e5e5;
+  --dial-text-secondary: #a3a3a3;
+  --dial-text-tertiary: #737373;
+
+  /* Borders - subtle light */
+  --dial-border: #404040;
+  --dial-border-hover: #525252;
+
+  /* Panel background */
+  --dial-glass-bg: #1a1a1a;
+}
+
+/* Dark mode panel container - dark piano key styling */
+.dark .dialkit-panel-inner:not([data-collapsed="true"]):not([data-collapsed=true]) {
+  background: linear-gradient(to bottom, #2a2a2a, #222222, #1a1a1a) !important;
+  border: 1px solid #404040 !important;
+  border-bottom: 5px solid #171717 !important;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* Dark mode top highlight */
+.dark .dialkit-panel-inner:not([data-collapsed="true"]):not([data-collapsed=true])::before {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark mode collapsed panel */
+.dark .dialkit-panel-inner[data-collapsed="true"],
+.dark .dialkit-panel-inner[data-collapsed=true] {
+  background: linear-gradient(to bottom, #2a2a2a, #222222, #1a1a1a) !important;
+  border: 1px solid #404040 !important;
+  border-bottom: 5px solid #171717 !important;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+.dark .dialkit-panel-inner[data-collapsed="true"]:hover,
+.dark .dialkit-panel-inner[data-collapsed=true]:hover {
+  background: linear-gradient(to bottom, #333333, #2a2a2a, #222222) !important;
+}
+
+.dark .dialkit-panel-inner[data-collapsed="true"]:active,
+.dark .dialkit-panel-inner[data-collapsed=true]:active {
+  border-bottom-width: 2px !important;
+  transform: translateY(3px) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 2px 4px rgba(0,0,0,0.4) !important;
+}
+
+.dark .dialkit-panel-inner[data-collapsed="true"]::before,
+.dark .dialkit-panel-inner[data-collapsed=true]::before {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark mode panel header border */
+.dark .dialkit-panel-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Dark mode folder title text */
+.dark .dialkit-folder-title {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-folder-title-root {
+  color: #e5e5e5 !important;
+}
+
+/* Dark mode folder dividers */
+.dark .dialkit-folder {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .dialkit-folder:not(.dialkit-folder-root) {
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Dark mode sliders */
+.dark .dialkit-slider {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-slider:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Dark mode slider label and value text */
+.dark .dialkit-slider-label {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-slider-value {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-slider-active .dialkit-slider-value {
+  color: #e5e5e5 !important;
+}
+
+/* Dark mode slider fill */
+.dark .dialkit-slider-fill {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-slider-active .dialkit-slider-fill {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Dark mode slider handle */
+.dark .dialkit-slider-handle {
+  background: #a3a3a3 !important;
+}
+
+/* Dark mode slider hashmarks */
+.dark .dialkit-slider-active .dialkit-slider-hashmark {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Dark mode segmented controls */
+.dark .dialkit-segmented {
+  background: transparent !important;
+}
+
+.dark .dialkit-segmented-pill {
+  background: linear-gradient(to bottom, #333333, #2a2a2a) !important;
+  border: 1px solid #404040 !important;
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.2) !important;
+}
+
+.dark .dialkit-segmented-button {
+  color: #737373 !important;
+}
+
+.dark .dialkit-segmented-button[data-active="true"] {
+  color: #e5e5e5 !important;
+}
+
+/* Dark mode select triggers */
+.dark .dialkit-select-trigger {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .dialkit-select-trigger[data-open="true"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Dark mode select label and value */
+.dark .dialkit-select-label,
+.dark .dialkit-select-value {
+  color: #a3a3a3 !important;
+}
+
+/* Dark mode select dropdown */
+.dark .dialkit-select-dropdown {
+  background: linear-gradient(to bottom, #2a2a2a, #222222, #1a1a1a) !important;
+  border: 1px solid #404040 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+}
+
+.dark .dialkit-select-option {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-select-option:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .dialkit-select-option[data-selected="true"] {
+  color: #e5e5e5 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Dark mode panel icon */
+.dark .dialkit-panel-icon {
+  color: #a3a3a3 !important;
+}
+
+/* Dark mode folder caret/chevron */
+.dark .dialkit-folder-icon,
+.dark .dialkit-select-chevron {
+  color: #737373 !important;
+}
+
+/* Dark mode labeled controls */
+.dark .dialkit-labeled-control {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-labeled-control-label {
+  color: #a3a3a3 !important;
+}
+
+/* Dark mode toggle styling */
+.dark .dialkit-toggle {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-toggle:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .dialkit-toggle-label {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-toggle-track {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.dark .dialkit-toggle[data-checked="true"] .dialkit-toggle-track {
+  background: #a3a3a3 !important;
+}
+
+.dark .dialkit-toggle-thumb {
+  background: #1a1a1a !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+}
+
+/* Dark mode buttons */
+.dark .dialkit-button,
+.dark .dialkit-action-button {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-button:hover,
+.dark .dialkit-action-button:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #e5e5e5 !important;
+}
+
+/* Dark mode text/color controls */
+.dark .dialkit-text-control,
+.dark .dialkit-color-control {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-text-input,
+.dark .dialkit-color-hex,
+.dark .dialkit-color-hex-input {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-text-input:focus,
+.dark .dialkit-color-hex-input:focus {
+  color: #e5e5e5 !important;
+}
+
+/* Dark mode preset manager dropdown */
+.dark .dialkit-preset-dropdown {
+  background: linear-gradient(to bottom, #2a2a2a, #222222, #1a1a1a) !important;
+  border: 1px solid #404040 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+}
+
+.dark .dialkit-preset-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .dialkit-preset-item[data-active="true"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-preset-name {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-preset-item[data-active="true"] .dialkit-preset-name {
+  color: #e5e5e5 !important;
+}
+
+.dark .dialkit-preset-delete svg {
+  color: #a3a3a3 !important;
+}
+
+.dark .dialkit-preset-input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #e5e5e5 !important;
+}
+
+.dark .dialkit-preset-confirm {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.dark .dialkit-preset-confirm:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dialkit-preset-confirm svg {
+  color: #a3a3a3 !important;
 }
