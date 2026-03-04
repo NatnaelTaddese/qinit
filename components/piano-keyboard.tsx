@@ -2,10 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useAudio } from "@/hooks/use-audio";
-import { useMIDI } from "@/hooks/use-midi";
 import { useKeyboard } from "@/hooks/use-keyboard";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
+import Scrubber from "@/components/smoothui/scrubber";
 
 interface KeyConfig {
   note: number;
@@ -46,8 +45,11 @@ interface PianoKeyboardProps {
   onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
-export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProps) {
-  const { initAudio, playNote, stopNote, isReady } = useAudio();
+export function PianoKeyboard({
+  className,
+  onCollapseChange,
+}: PianoKeyboardProps) {
+  const { initAudio, playNote, stopNote, isReady, adsr, setAdsr } = useAudio();
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [showKeyboardLabels, setShowKeyboardLabels] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -72,23 +74,6 @@ export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProp
       });
     },
     [stopNote],
-  );
-
-  // MIDI support
-  const {
-    devices,
-    isSupported: isMIDISupported,
-    selectedDevice,
-    selectDevice,
-  } = useMIDI(
-    useCallback(
-      ({ note }) => {
-        initAudio();
-        handleNoteOn(note);
-      },
-      [handleNoteOn, initAudio],
-    ),
-    handleNoteOff,
   );
 
   // Keyboard support
@@ -128,7 +113,7 @@ export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProp
     <div
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm transition-all duration-300 ease-in-out",
-        isCollapsed ? "h-12" : "h-[260px]",
+        isCollapsed ? "h-12" : "h-[320px]",
         className,
       )}
     >
@@ -173,58 +158,18 @@ export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProp
         {/* Keyboard Content */}
         <div
           className={cn(
-            "flex flex-1 flex-col gap-3 overflow-hidden py-4 transition-opacity duration-300",
+            "flex flex-1 gap-4 overflow-visible py-4 transition-opacity duration-300 justify-around items-center",
             isCollapsed ? "opacity-0" : "opacity-100",
           )}
         >
-          {/* Controls */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {isMIDISupported && devices.length > 0 && (
-                <select
-                  value={selectedDevice || ""}
-                  onChange={(e) => selectDevice(e.target.value)}
-                  className="w-40 rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {devices.map((device) => (
-                    <option key={device.id} value={device.id}>
-                      {device.name || "Unknown Device"}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {isMIDISupported && devices.length === 0 && (
-                <span className="text-xs text-muted-foreground">
-                  No MIDI devices
-                </span>
-              )}
-
-              {!isMIDISupported && (
-                <span className="text-xs text-muted-foreground">
-                  MIDI not supported
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={showKeyboardLabels}
-                onCheckedChange={setShowKeyboardLabels}
-                size="sm"
-              />
-              <span className="text-xs text-muted-foreground">Show keys</span>
-            </div>
-          </div>
-
-          {/* Keyboard */}
-          <div className="relative flex-1 select-none">
-            {/* White keys container - used for alignment reference */}
+          {/* Keyboard - Left Side */}
+          <div className="relative  select-none">
+            {/* White keys container */}
             <div
               id="white-keys-container"
-              className="flex h-[140px] justify-center gap-[2px]"
+              className="flex h-40 justify-center gap-0.5"
             >
-              {whiteKeys.map((key, index) => (
+              {whiteKeys.map((key) => (
                 <div key={key.note} className="relative" style={{ width: 48 }}>
                   <PianoKeyWhite
                     config={key}
@@ -239,23 +184,21 @@ export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProp
               ))}
             </div>
 
-            {/* Black keys - positioned absolutely based on which white keys they're between */}
-            <div className="pointer-events-none absolute left-0 right-0 top-0 flex h-[72px] justify-center gap-[2px]">
+            {/* Black keys */}
+            <div className="pointer-events-none absolute left-0 right-0 top-0 flex h-[72px] justify-center gap-0.5">
               {whiteKeys.map((key, index) => {
-                // Find if there's a black key after this white key
                 const nextWhiteNote = whiteKeys[index + 1]?.note;
                 const blackKey = blackKeys.find(
                   (bk) =>
                     bk.note > key.note && bk.note < (nextWhiteNote || Infinity),
                 );
 
-                if (!blackKey)
+                if (!blackKey) {
                   return (
                     <div key={`empty-${key.note}`} style={{ width: 48 }} />
                   );
+                }
 
-                // Position black key in the gap between white keys
-                // Centered on the boundary between white keys
                 return (
                   <div
                     key={`black-${blackKey.note}`}
@@ -282,6 +225,67 @@ export function PianoKeyboard({ className, onCollapseChange }: PianoKeyboardProp
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Controls Panel - Right Side */}
+          <div className="flex h-fit w-72 shrink-0 flex-col gap-2">
+            {/* ADSR Controls - Two rows */}
+            <div className="flex flex-1 gap-2">
+              {/* Row 1: Attack & Decay */}
+              <div className="flex flex-1 flex-col gap-2">
+                <Scrubber
+                  label="Attack"
+                  value={adsr.attack}
+                  onValueChange={(value) =>
+                    setAdsr((prev) => ({ ...prev, attack: value }))
+                  }
+                  min={0.001}
+                  max={1}
+                  step={0.001}
+                  decimals={2}
+                  ticks={0}
+                />
+                <Scrubber
+                  label="Decay"
+                  value={adsr.decay}
+                  onValueChange={(value) =>
+                    setAdsr((prev) => ({ ...prev, decay: value }))
+                  }
+                  min={0.001}
+                  max={1}
+                  step={0.001}
+                  decimals={2}
+                  ticks={0}
+                />
+              </div>
+              {/* Row 2: Sustain & Release */}
+              <div className="flex flex-1 flex-col gap-2">
+                <Scrubber
+                  label="Sustain"
+                  value={adsr.sustain}
+                  onValueChange={(value) =>
+                    setAdsr((prev) => ({ ...prev, sustain: value }))
+                  }
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  decimals={2}
+                  ticks={0}
+                />
+                <Scrubber
+                  label="Release"
+                  value={adsr.release}
+                  onValueChange={(value) =>
+                    setAdsr((prev) => ({ ...prev, release: value }))
+                  }
+                  min={0.01}
+                  max={2}
+                  step={0.01}
+                  decimals={2}
+                  ticks={0}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -370,7 +374,7 @@ function PianoKeyBlack({
   return (
     <button
       className={cn(
-        "group relative flex h-[72px] w-8 flex-col items-center justify-end rounded-b-[2px] border pb-2 transition-all",
+        "group relative flex h-[82px] w-8 flex-col items-center justify-end rounded-b-[2px] border pb-2 transition-all",
         "border-gray-950 border-b-[5px] bg-gradient-to-b from-gray-700 via-gray-800 to-gray-900",
         "shadow-[0_6px_8px_-2px_rgba(0,0,0,0.4),0_4px_6px_-2px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)]",
         "active:border-b-[2px] active:translate-y-[3px] active:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(0,0,0,0.4)]",

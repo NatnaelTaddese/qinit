@@ -10,8 +10,10 @@ export default function Home() {
   return (
     <div className="flex h-screen flex-col">
       {/* Scrollable Content Area */}
-      <ScrollArea 
-        className={isKeyboardCollapsed ? "h-[calc(100vh-48px)]" : "h-[calc(100vh-260px)]"}
+      <ScrollArea
+        className={
+          isKeyboardCollapsed ? "h-[calc(100vh-48px)]" : "h-[calc(100vh-320px)]"
+        }
       >
         <main className="flex min-h-full flex-col items-center justify-start p-8">
           <div className="w-full max-w-4xl">
@@ -27,12 +29,12 @@ export default function Home() {
               <div className="rounded-lg border border-border bg-card p-8">
                 <h2 className="text-xl font-semibold mb-4">Welcome</h2>
                 <p className="text-muted-foreground">
-                  This platform will help you learn Ethiopian scales. 
-                  Use the piano keyboard docked at the bottom to practice.
+                  This platform will help you learn Ethiopian scales. Use the
+                  piano keyboard docked at the bottom to practice.
                 </p>
                 <p className="text-muted-foreground mt-2">
-                  You can play using your computer keyboard (keys shown on piano keys), 
-                  click with your mouse, or connect a MIDI device.
+                  You can play using your computer keyboard (keys shown on piano
+                  keys), click with your mouse, or connect a MIDI device.
                 </p>
               </div>
 
