@@ -331,7 +331,7 @@ export function ScaleExplorer({
               style={{ borderColor: "rgba(249, 115, 22, 0.2)" }}
             >
               <span className="opacity-70">INSTALL:</span>{" "}
-              Copy to <code className="text-orange-400/70">User Library/MIDI Tools/Max Transformations</code>
+              Unzip and copy the <code className="text-orange-400/70">Kiñit Scale</code> folder to <code className="text-orange-400/70">User Library/MIDI Tools/Max Transformations/</code>
             </div>
           </LCDScreen>
         </>
