@@ -225,24 +225,116 @@ export function ScaleExplorer({
 
       {/* Kiñit Overview */}
       {activeTab === "kinit" && (
-        <LCDScreen>
-          <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-40 font-mono text-emerald-400">
-            System Overview
-          </div>
-          <h2 className="text-xl font-bold tracking-wide mb-4 text-emerald-400">
-            Ethiopian Kiñit Scales
-          </h2>
-          <p className="text-sm leading-relaxed mb-3 text-emerald-400/80">
-            Kiñit (ቅኝት) refers to the system of modes or scales in Ethiopian
-            music. Unlike Western music's major/minor dichotomy, Ethiopian music
-            uses a rich palette of pentatonic scales, each with its own
-            emotional character and cultural significance.
-          </p>
-          <p className="text-sm leading-relaxed text-emerald-400/60">
-            Select a scale above to explore its unique intervals, cultural
-            context, and notable artists who have mastered its expression.
-          </p>
-        </LCDScreen>
+        <>
+          <LCDScreen>
+            <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-40 font-mono text-emerald-400">
+              System Overview
+            </div>
+            <h2 className="text-xl font-bold tracking-wide mb-4 text-emerald-400">
+              Ethiopian Kiñit Scales
+            </h2>
+            <p className="text-sm leading-relaxed mb-3 text-emerald-400/80">
+              Kiñit (ቅኝት) refers to the system of modes or scales in Ethiopian
+              music. Unlike Western music's major/minor dichotomy, Ethiopian music
+              uses a rich palette of pentatonic scales, each with its own
+              emotional character and cultural significance.
+            </p>
+            <p className="text-sm leading-relaxed text-emerald-400/60">
+              Select a scale above to explore its unique intervals, cultural
+              context, and notable artists who have mastered its expression.
+            </p>
+          </LCDScreen>
+
+          {/* Ableton Live Device Download */}
+          <LCDScreen accentColor="#f97316">
+            <div className="flex gap-6">
+              {/* Device Screenshot */}
+              <div className="shrink-0">
+                <div
+                  className="rounded-[3px] overflow-hidden"
+                  style={{
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)",
+                  }}
+                >
+                  <img
+                    src="/kinit-scale-device.png"
+                    alt="Kiñit Scale MIDI Transformation Device"
+                    className="w-[140px] h-auto"
+                  />
+                </div>
+              </div>
+
+              {/* Info & Download */}
+              <div className="flex-1 flex flex-col">
+                <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-60 font-mono text-orange-400">
+                  Max for Live · Ableton Live 12
+                </div>
+                <h3 className="text-lg font-bold tracking-wide mb-2 text-orange-400">
+                  Kiñit Scale Transformation
+                </h3>
+                <p className="text-sm leading-relaxed mb-4 text-orange-400/80 flex-1">
+                  A MIDI transformation tool that snaps incoming notes to Ethiopian scales. 
+                  Use it in the Clip View to transform melodies, or enable Auto mode for 
+                  real-time scale locking while you play.
+                </p>
+
+                {/* Features */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs font-mono text-orange-400/60">
+                  <span>• 7 Ethiopian scales</span>
+                  <span>• Configurable root note</span>
+                  <span>• Real-time Auto mode</span>
+                </div>
+
+                {/* Download Button */}
+                <a
+                  href="/Kiñit Scale.zip"
+                  download
+                  className={cn(
+                    "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[3px] transition-all font-mono text-sm font-medium",
+                    "hover:translate-y-[1px] active:translate-y-[2px]",
+                    "self-start"
+                  )}
+                  style={{
+                    background: "linear-gradient(180deg, #f97316 0%, #ea580c 100%)",
+                    border: "1px solid #fb923c",
+                    boxShadow: `
+                      inset 0 1px 0 rgba(255,255,255,0.2),
+                      inset 0 -1px 2px rgba(0,0,0,0.3),
+                      0 2px 4px rgba(0,0,0,0.4),
+                      0 4px 8px rgba(0,0,0,0.2)
+                    `,
+                    color: "#fff",
+                    textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  Download for Ableton Live
+                </a>
+              </div>
+            </div>
+
+            {/* Installation hint */}
+            <div
+              className="mt-4 pt-3 border-t text-xs font-mono text-orange-400/50"
+              style={{ borderColor: "rgba(249, 115, 22, 0.2)" }}
+            >
+              <span className="opacity-70">INSTALL:</span>{" "}
+              Copy to <code className="text-orange-400/70">User Library/MIDI Tools/Max Transformations</code>
+            </div>
+          </LCDScreen>
+        </>
       )}
 
       {/* Quiz Mode */}
