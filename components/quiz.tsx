@@ -26,8 +26,9 @@ const ALL_SCALE_TYPES: ScaleType[] = [
 interface DetectionResult {
   scaleType: ScaleType;
   root: RootNote;
-  coverage: number; // fraction of pitch energy in scale (0–1)
-  relative: number; // relative to top result (0–100)
+  coverage: number;    // raw in-scale energy fraction (0–1), for display
+  score: number;       // penalized score: 0 = flat chroma, 1 = perfect match
+  relative: number;    // score relative to top result (0–100)
 }
 
 type DetectorState = "idle" | "loading" | "results" | "error";
@@ -118,7 +119,12 @@ function fft(re: Float64Array, im: Float64Array): void {
   }
 }
 
-// ─── Chromagram builder ──────────────────────────────────────────────────────
+// ─── Chromagram builder (energy-weighted) ───────────────────────────────────
+//
+// Each frame's spectral magnitudes are multiplied by the frame's RMS energy
+// before accumulation, so loud (musically prominent) frames dominate the
+// chromagram while near-silent frames are skipped entirely.
+//
 function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
   const FFT_SIZE = 4096;
   const sr = audioBuffer.sampleRate;
@@ -148,29 +154,40 @@ function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
   const re = new Float64Array(FFT_SIZE);
   const im = new Float64Array(FFT_SIZE);
 
-  const minBin = Math.max(1, Math.floor((55 * FFT_SIZE) / sr));   // ~A1 (55 Hz)
-  const maxBin = Math.ceil((4200 * FFT_SIZE) / sr);               // ~C8 area
+  const minBin = Math.max(1, Math.floor((55 * FFT_SIZE) / sr));  // ~A1 (55 Hz)
+  const maxBin = Math.ceil((4200 * FFT_SIZE) / sr);              // ~C8
+
+  // Silence gate: skip frames whose RMS is below 0.5% of full scale
+  const SILENCE_THRESHOLD = 0.005;
 
   for (let fi = 0; fi < FRAMES; fi++) {
     const offset = start + fi * step;
     if (offset + FFT_SIZE > len) break;
 
+    // Apply Hann window and compute frame RMS simultaneously
+    let sumSq = 0;
     for (let i = 0; i < FFT_SIZE; i++) {
       re[i] = mono[offset + i] * hann[i];
+      sumSq += re[i] * re[i];
       im[i] = 0;
     }
+    const rms = Math.sqrt(sumSq / FFT_SIZE);
+    if (rms < SILENCE_THRESHOLD) continue; // skip silent / near-silent frames
+
     fft(re, im);
 
+    // Accumulate energy-weighted spectral magnitude into chroma bins.
+    // Multiplying by rms means louder frames contribute proportionally more.
     for (let b = minBin; b < Math.min(maxBin, FFT_SIZE / 2); b++) {
       const freq = (b * sr) / FFT_SIZE;
       const midi = 69 + 12 * Math.log2(freq / 440);
       const pc = ((Math.round(midi) % 12) + 12) % 12;
       const mag = Math.sqrt(re[b] * re[b] + im[b] * im[b]);
-      chroma[pc] += mag;
+      chroma[pc] += mag * rms;
     }
   }
 
-  // L1-normalize
+  // L1-normalize so chroma sums to 1
   let total = 0;
   for (let i = 0; i < 12; i++) total += chroma[i];
   if (total > 0)
@@ -180,6 +197,18 @@ function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
 }
 
 // ─── Score all 84 scale variants ────────────────────────────────────────────
+//
+// Penalized scoring:
+//   score = in_energy − (NUM_IN / NUM_OUT) × out_energy
+//         = in_energy − (5/7) × (1 − in_energy)
+//
+// Derivation: a perfectly flat (uniform) chromagram has in_energy = 5/12.
+// Setting the flat-chroma score to 0 and solving gives the 5/7 coefficient.
+// Perfect match (in_energy = 1) → score = 1.
+// Worse than random → score < 0 (clamped to 0 for display).
+//
+const PENALTY = 5 / 7; // NUM_IN / NUM_OUT for 5-note scales
+
 function detectScales(chroma: Float64Array): DetectionResult[] {
   const results: DetectionResult[] = [];
 
@@ -191,14 +220,17 @@ function detectScales(chroma: Float64Array): DetectionResult[] {
         const pc = NOTE_TO_PC[note];
         if (pc !== undefined) coverage += chroma[pc];
       }
-      results.push({ scaleType, root, coverage, relative: 0 });
+      const outEnergy = 1 - coverage;
+      const score = Math.max(0, coverage - PENALTY * outEnergy);
+      results.push({ scaleType, root, coverage, score, relative: 0 });
     }
   }
 
-  results.sort((a, b) => b.coverage - a.coverage);
+  results.sort((a, b) => b.score - a.score);
 
-  const maxCov = results[0]?.coverage ?? 1;
-  for (const r of results) r.relative = maxCov > 0 ? Math.round((r.coverage / maxCov) * 100) : 0;
+  const maxScore = results[0]?.score ?? 1;
+  for (const r of results)
+    r.relative = maxScore > 0 ? Math.round((r.score / maxScore) * 100) : 0;
 
   return results;
 }
@@ -400,14 +432,32 @@ export function Quiz() {
               Top matches · {fileName && <span className="normal-case opacity-70">{fileName}</span>}
             </div>
 
+            {/* Table header */}
+            <div className="flex items-center mb-2 font-mono text-[9px] uppercase tracking-wider opacity-40" style={{ color: ACCENT }}>
+              <span className="w-4 mr-2" />
+              <span className="w-2 mr-2" />
+              <span className="flex-1">Scale</span>
+              <span className="w-24 text-right">Notes in scale</span>
+              <span className="w-20 text-right">Confidence</span>
+            </div>
+
             <div className="space-y-2">
               {topResults.map((r, idx) => {
                 const info = SCALE_INFO[r.scaleType];
                 const coveragePct = Math.round(r.coverage * 100);
+                const scorePct = Math.round(r.score * 100);
                 const isTop = idx === 0;
 
                 return (
-                  <div key={`${r.scaleType}-${r.root}`} className="space-y-1">
+                  <div
+                    key={`${r.scaleType}-${r.root}`}
+                    className="space-y-1.5 rounded-[3px] px-2 py-1.5"
+                    style={{
+                      background: `${info.color}${isTop ? "14" : "08"}`,
+                      border: `1px solid ${info.color}${isTop ? "30" : "15"}`,
+                      boxShadow: isTop ? `0 0 12px ${info.color}10` : "none",
+                    }}
+                  >
                     {/* Label row */}
                     <div className="flex items-baseline justify-between">
                       <div className="flex items-center gap-2">
@@ -418,51 +468,43 @@ export function Quiz() {
                         >
                           {idx + 1}
                         </span>
-                        {/* Color dot */}
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{
-                            background: info.color,
-                            boxShadow: isTop ? `0 0 6px ${info.color}` : "none",
-                          }}
-                        />
                         {/* Name */}
                         <span
                           className={cn(
                             "font-mono text-sm",
                             isTop ? "font-bold" : "font-medium opacity-80",
                           )}
-                          style={{ color: info.color }}
+                          style={{
+                            color: info.color,
+                            textShadow: isTop ? `0 0 10px ${info.color}80` : "none",
+                          }}
                         >
                           {r.root} {info.name}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 font-mono text-xs">
-                        {/* Coverage */}
+                      <div className="flex items-center gap-0 font-mono text-xs">
                         <span
-                          className="opacity-50"
+                          className="w-24 text-right opacity-40"
                           style={{ color: info.color }}
-                          title="Fraction of pitch energy in this scale"
                         >
-                          {coveragePct}% match
+                          {coveragePct}%
                         </span>
-                        {/* Relative confidence bar label */}
                         <span
-                          className={cn("font-bold", isTop && "text-sm")}
+                          className={cn("w-20 text-right font-bold", isTop && "text-sm")}
                           style={{
                             color: info.color,
                             textShadow: isTop ? `0 0 8px ${info.color}` : "none",
                           }}
                         >
-                          {r.relative}%
+                          {scorePct}%
                         </span>
                       </div>
                     </div>
 
                     {/* Bar */}
                     <div
-                      className="relative h-[5px] rounded-full ml-6"
+                      className="relative h-[4px] rounded-full"
                       style={{ background: `${info.color}18` }}
                     >
                       <div
@@ -509,10 +551,11 @@ export function Quiz() {
             How it works
           </div>
           <p className="text-xs leading-relaxed opacity-60 font-mono" style={{ color: ACCENT }}>
-            The detector builds a <strong className="opacity-90">chromagram</strong> — a pitch-class profile — by
-            running FFT analysis across the audio and summing spectral energy into 12 semitone
-            bins. Each of the 84 Ethiopian scale variants (7 scales × 12 roots) is scored by how
-            much of the audio&apos;s energy falls within its notes. Results are ranked by confidence.
+            Builds an <strong className="opacity-90">energy-weighted chromagram</strong> via FFT — each frame&apos;s
+            spectral energy is weighted by its RMS, so loud frames dominate and silence is ignored.
+            Each of the 84 variants (7 scales × 12 roots) is scored as{" "}
+            <strong className="opacity-90">in_energy − (5/7) × out_energy</strong>, which penalises
+            off-note energy and normalises so a flat spectrum scores 0 and a perfect match scores 100%.
           </p>
         </LCDScreen>
       )}
