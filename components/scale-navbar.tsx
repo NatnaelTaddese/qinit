@@ -70,7 +70,7 @@ export function ScaleNavbar({
               active={activeTab === "quiz"}
               onClick={() => onTabChange("quiz")}
             >
-              Quiz
+              Detect
             </TabButton>
           </div>
 

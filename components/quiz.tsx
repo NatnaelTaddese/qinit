@@ -1,58 +1,42 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef, DragEvent, ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
 import {
   ScaleType,
   RootNote,
   ROOT_NOTES,
   SCALE_INFO,
-  getScaleMidiNotes,
   getScaleNotes,
-  midiToNoteName,
 } from "@/lib/scales";
 
-// Quiz Types
-type QuizMode = "scale-id" | "note-membership";
-type QuizState = "menu" | "playing" | "feedback" | "results";
-type Difficulty = 1 | 2 | 3 | 4; // Unlocks more scales progressively
-
-interface QuizQuestion {
-  mode: QuizMode;
-  correctAnswer: string;
-  options: string[];
-  scaleType?: ScaleType;
-  root?: RootNote;
-  targetNote?: string;
-}
-
-interface QuizProps {
-  onPlayNote?: (midi: number) => void;
-  onStopNote?: (midi: number) => void;
-}
-
-// Difficulty progression: which scales are available at each level
-const DIFFICULTY_SCALES: Record<Difficulty, ScaleType[]> = {
-  1: ["tizita-major", "tizita-minor"],
-  2: ["tizita-major", "tizita-minor", "bati-major", "bati-minor"],
-  3: ["tizita-major", "tizita-minor", "bati-major", "bati-minor", "ambassel-major", "ambassel-minor"],
-  4: ["tizita-major", "tizita-minor", "bati-major", "bati-minor", "ambassel-major", "ambassel-minor", "anchihoye"],
+// Pitch class (0–11) for each note name
+const NOTE_TO_PC: Record<string, number> = {
+  C: 0, "C#": 1, D: 2, "D#": 3, E: 4, F: 5,
+  "F#": 6, G: 7, "G#": 8, A: 9, "A#": 10, B: 11,
 };
 
-const DIFFICULTY_LABELS: Record<Difficulty, string> = {
-  1: "Beginner",
-  2: "Intermediate",
-  3: "Advanced",
-  4: "Master",
-};
+const ALL_SCALE_TYPES: ScaleType[] = [
+  "tizita-major", "tizita-minor",
+  "bati-major", "bati-minor",
+  "ambassel-major", "ambassel-minor",
+  "anchihoye",
+];
 
-const QUESTIONS_PER_ROUND = 10;
+interface DetectionResult {
+  scaleType: ScaleType;
+  root: RootNote;
+  coverage: number; // fraction of pitch energy in scale (0–1)
+  relative: number; // relative to top result (0–100)
+}
 
-// LCD Screen Component
+type DetectorState = "idle" | "loading" | "results" | "error";
+
+// ─── LCD Screen ─────────────────────────────────────────────────────────────
 function LCDScreen({
   children,
   className,
-  accentColor = "#f59e0b",
+  accentColor = "#06b6d4",
 }: {
   children: React.ReactNode;
   className?: string;
@@ -61,12 +45,11 @@ function LCDScreen({
   return (
     <div
       className={cn(
-        "relative overflow-hidden",
-        "rounded-[4px]",
+        "relative overflow-hidden rounded-[4px]",
         "bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950",
         "p-[3px]",
         "shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]",
-        className
+        className,
       )}
     >
       <div className="rounded-[2px] bg-gradient-to-b from-zinc-950 to-zinc-900 p-[2px]">
@@ -74,25 +57,17 @@ function LCDScreen({
           className="relative rounded-[1px] p-4"
           style={{
             background: `linear-gradient(145deg, ${accentColor}08, ${accentColor}15, ${accentColor}05)`,
-            boxShadow: `
-              inset 0 0 60px rgba(0,0,0,0.3),
-              inset 0 1px 0 rgba(255,255,255,0.03),
-              inset 0 -1px 0 rgba(0,0,0,0.5)
-            `,
+            boxShadow: `inset 0 0 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.5)`,
           }}
         >
+          {/* scanline overlay */}
           <div
             className="absolute inset-0 pointer-events-none opacity-[0.03] rounded-[1px]"
             style={{
-              backgroundImage: `repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(0,0,0,0.3) 2px,
-                rgba(0,0,0,0.3) 4px
-              )`,
+              backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)`,
             }}
           />
+          {/* screen glare */}
           <div
             className="absolute inset-0 pointer-events-none rounded-[1px]"
             style={{
@@ -106,564 +81,497 @@ function LCDScreen({
   );
 }
 
-// MPC-style Button
-function MPCButton({
-  children,
-  onClick,
-  color = "#f59e0b",
-  selected = false,
-  correct,
-  disabled = false,
-  className,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  color?: string;
-  selected?: boolean;
-  correct?: boolean | null;
-  disabled?: boolean;
-  className?: string;
-}) {
-  const isCorrect = correct === true;
-  const isWrong = correct === false;
-  const showState = correct !== undefined && correct !== null;
+// ─── FFT (Cooley–Tukey radix-2 DIT, in-place) ───────────────────────────────
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  // bit-reversal
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  // butterfly stages
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1;
+    const ang = (-2 * Math.PI) / len;
+    const dwr = Math.cos(ang);
+    const dwi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let wr = 1, wi = 0;
+      for (let j = 0; j < half; j++) {
+        const ur = re[i + j], ui = im[i + j];
+        const vr = re[i + j + half] * wr - im[i + j + half] * wi;
+        const vi = re[i + j + half] * wi + im[i + j + half] * wr;
+        re[i + j] = ur + vr;
+        im[i + j] = ui + vi;
+        re[i + j + half] = ur - vr;
+        im[i + j + half] = ui - vi;
+        const nwr = wr * dwr - wi * dwi;
+        wi = wr * dwi + wi * dwr;
+        wr = nwr;
+      }
+    }
+  }
+}
 
-  let bgColor = color;
-  if (showState) {
-    bgColor = isCorrect ? "#22c55e" : isWrong ? "#ef4444" : color;
+// ─── Chromagram builder ──────────────────────────────────────────────────────
+function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
+  const FFT_SIZE = 4096;
+  const sr = audioBuffer.sampleRate;
+  const chroma = new Float64Array(12);
+
+  // Mix to mono
+  const numCh = audioBuffer.numberOfChannels;
+  const len = audioBuffer.length;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < numCh; c++) {
+    const ch = audioBuffer.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += ch[i] / numCh;
   }
 
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "relative px-4 py-3 rounded-[3px] transition-all font-mono text-sm",
-        !disabled && "hover:translate-y-[1px] active:translate-y-[2px]",
-        disabled && "cursor-not-allowed opacity-70",
-        selected && "translate-y-[2px]",
-        className
-      )}
-      style={{
-        background: selected || showState
-          ? `linear-gradient(180deg, ${bgColor}90 0%, ${bgColor}70 100%)`
-          : `linear-gradient(180deg, ${bgColor}50 0%, ${bgColor}35 50%, ${bgColor}30 100%)`,
-        border: `1px solid ${selected || showState ? bgColor : `${bgColor}60`}`,
-        boxShadow: selected
-          ? `
-              inset 0 1px 0 ${bgColor}aa,
-              inset 0 -1px 2px rgba(0,0,0,0.4),
-              0 1px 2px rgba(0,0,0,0.5)
-            `
-          : `
-              inset 0 1px 0 ${bgColor}40,
-              inset 0 -1px 2px rgba(0,0,0,0.3),
-              0 2px 4px rgba(0,0,0,0.4),
-              0 3px 6px rgba(0,0,0,0.2)
-            `,
-        color: selected || showState ? "#fff" : bgColor,
-        textShadow: selected || showState ? `0 0 8px ${bgColor}` : "none",
-      }}
-    >
-      {children}
-    </button>
-  );
+  // Hann window
+  const hann = new Float32Array(FFT_SIZE);
+  for (let i = 0; i < FFT_SIZE; i++)
+    hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FFT_SIZE - 1)));
+
+  // Sample frames uniformly, skip first/last 5% (common silence regions)
+  const start = Math.floor(len * 0.05);
+  const end = Math.floor(len * 0.95);
+  const available = end - start - FFT_SIZE;
+  const FRAMES = Math.max(1, Math.min(200, Math.floor(available / (FFT_SIZE / 4))));
+  const step = Math.max(1, Math.floor(available / FRAMES));
+
+  const re = new Float64Array(FFT_SIZE);
+  const im = new Float64Array(FFT_SIZE);
+
+  const minBin = Math.max(1, Math.floor((55 * FFT_SIZE) / sr));   // ~A1 (55 Hz)
+  const maxBin = Math.ceil((4200 * FFT_SIZE) / sr);               // ~C8 area
+
+  for (let fi = 0; fi < FRAMES; fi++) {
+    const offset = start + fi * step;
+    if (offset + FFT_SIZE > len) break;
+
+    for (let i = 0; i < FFT_SIZE; i++) {
+      re[i] = mono[offset + i] * hann[i];
+      im[i] = 0;
+    }
+    fft(re, im);
+
+    for (let b = minBin; b < Math.min(maxBin, FFT_SIZE / 2); b++) {
+      const freq = (b * sr) / FFT_SIZE;
+      const midi = 69 + 12 * Math.log2(freq / 440);
+      const pc = ((Math.round(midi) % 12) + 12) % 12;
+      const mag = Math.sqrt(re[b] * re[b] + im[b] * im[b]);
+      chroma[pc] += mag;
+    }
+  }
+
+  // L1-normalize
+  let total = 0;
+  for (let i = 0; i < 12; i++) total += chroma[i];
+  if (total > 0)
+    for (let i = 0; i < 12; i++) chroma[i] /= total;
+
+  return chroma;
 }
 
-// Progress Bar
-function ProgressBar({
-  current,
-  total,
-  color = "#f59e0b",
-}: {
-  current: number;
-  total: number;
-  color?: string;
-}) {
-  const percentage = (current / total) * 100;
-  return (
-    <div className="relative h-2 rounded-full bg-zinc-800 overflow-hidden">
-      <div
-        className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-        style={{
-          width: `${percentage}%`,
-          background: `linear-gradient(90deg, ${color}80, ${color})`,
-          boxShadow: `0 0 8px ${color}60`,
-        }}
-      />
-    </div>
-  );
+// ─── Score all 84 scale variants ────────────────────────────────────────────
+function detectScales(chroma: Float64Array): DetectionResult[] {
+  const results: DetectionResult[] = [];
+
+  for (const scaleType of ALL_SCALE_TYPES) {
+    for (const root of ROOT_NOTES) {
+      const notes = getScaleNotes(scaleType, root);
+      let coverage = 0;
+      for (const note of notes) {
+        const pc = NOTE_TO_PC[note];
+        if (pc !== undefined) coverage += chroma[pc];
+      }
+      results.push({ scaleType, root, coverage, relative: 0 });
+    }
+  }
+
+  results.sort((a, b) => b.coverage - a.coverage);
+
+  const maxCov = results[0]?.coverage ?? 1;
+  for (const r of results) r.relative = maxCov > 0 ? Math.round((r.coverage / maxCov) * 100) : 0;
+
+  return results;
 }
 
-// Stats Display
-function StatDisplay({
-  label,
-  value,
-  color = "#f59e0b",
-}: {
-  label: string;
-  value: string | number;
-  color?: string;
-}) {
-  return (
-    <div className="text-center">
-      <div className="text-[10px] uppercase tracking-wider opacity-50 font-mono" style={{ color }}>
-        {label}
-      </div>
-      <div className="text-2xl font-bold font-mono" style={{ color }}>
-        {value}
-      </div>
-    </div>
-  );
-}
+// ─── Main component ──────────────────────────────────────────────────────────
+const ACCENT = "#06b6d4"; // cyan
 
-export function Quiz({ onPlayNote, onStopNote }: QuizProps) {
-  const [state, setState] = useState<QuizState>("menu");
-  const [mode, setMode] = useState<QuizMode>("scale-id");
-  const [difficulty, setDifficulty] = useState<Difficulty>(1);
-  const [unlockedDifficulty, setUnlockedDifficulty] = useState<Difficulty>(1);
-  const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null);
-  const [questionNumber, setQuestionNumber] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [streak, setStreak] = useState(0);
-  const [bestStreak, setBestStreak] = useState(0);
+export function Quiz() {
+  const [detectorState, setDetectorState] = useState<DetectorState>("idle");
+  const [results, setResults] = useState<DetectionResult[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isPlayingRef = useRef(false);
-  const accentColor = "#f59e0b"; // Amber for quiz
-
-  // Generate a random question
-  const generateQuestion = useCallback((): QuizQuestion => {
-    const availableScales = DIFFICULTY_SCALES[difficulty];
-    const randomScale = availableScales[Math.floor(Math.random() * availableScales.length)];
-    const randomRoot = ROOT_NOTES[Math.floor(Math.random() * ROOT_NOTES.length)];
-
-    if (mode === "scale-id") {
-      // Scale Identification: Play a scale, identify which one it is
-      const options = shuffleArray([...availableScales]).slice(0, 4);
-      if (!options.includes(randomScale)) {
-        options[0] = randomScale;
-      }
-      
-      return {
-        mode: "scale-id",
-        correctAnswer: randomScale,
-        options: shuffleArray(options),
-        scaleType: randomScale,
-        root: randomRoot,
-      };
-    } else {
-      // Note Membership: Given a scale and root, which note belongs?
-      const scaleNotes = getScaleNotes(randomScale, randomRoot);
-      const allNotes = ROOT_NOTES as readonly string[];
-      const notInScale = allNotes.filter(n => !scaleNotes.includes(n));
-      
-      // 50% chance: "which note IS in the scale" vs "which note is NOT in the scale"
-      const askForInScale = Math.random() > 0.5;
-      
-      if (askForInScale) {
-        // Pick a correct note and 3 wrong notes
-        const correctNote = scaleNotes[Math.floor(Math.random() * scaleNotes.length)];
-        const wrongNotes = shuffleArray([...notInScale]).slice(0, 3);
-        const options = shuffleArray([correctNote, ...wrongNotes]);
-        
-        return {
-          mode: "note-membership",
-          correctAnswer: correctNote,
-          options,
-          scaleType: randomScale,
-          root: randomRoot,
-          targetNote: "in",
-        };
-      } else {
-        // Pick a wrong note and 3 correct notes
-        const wrongNote = notInScale[Math.floor(Math.random() * notInScale.length)];
-        const correctNotes = shuffleArray([...scaleNotes]).slice(0, 3);
-        const options = shuffleArray([wrongNote, ...correctNotes]);
-        
-        return {
-          mode: "note-membership",
-          correctAnswer: wrongNote,
-          options,
-          scaleType: randomScale,
-          root: randomRoot,
-          targetNote: "out",
-        };
-      }
-    }
-  }, [mode, difficulty]);
-
-  // Play the scale for scale-id questions
-  const playScaleForQuestion = useCallback(async () => {
-    if (!currentQuestion || !onPlayNote || !onStopNote || isPlayingRef.current) return;
-    if (currentQuestion.mode !== "scale-id") return;
-
-    isPlayingRef.current = true;
-    const midiNotes = getScaleMidiNotes(currentQuestion.scaleType!, currentQuestion.root!, 4);
-    const notesToPlay = [...midiNotes, midiNotes[0] + 12]; // Add octave
-
-    for (const note of notesToPlay) {
-      if (!isPlayingRef.current) break;
-      onPlayNote(note);
-      await new Promise((resolve) => setTimeout(resolve, 280));
-      onStopNote(note);
-      await new Promise((resolve) => setTimeout(resolve, 40));
-    }
-    isPlayingRef.current = false;
-  }, [currentQuestion, onPlayNote, onStopNote]);
-
-  // Start a new round
-  const startRound = useCallback(() => {
-    setScore(0);
-    setQuestionNumber(0);
-    setStreak(0);
-    setSelectedAnswer(null);
-    setIsCorrect(null);
-    const q = generateQuestion();
-    setCurrentQuestion(q);
-    setState("playing");
-  }, [generateQuestion]);
-
-  // Handle answer selection
-  const handleAnswer = useCallback((answer: string) => {
-    if (state !== "playing" || selectedAnswer) return;
-
-    setSelectedAnswer(answer);
-    const correct = answer === currentQuestion?.correctAnswer;
-    setIsCorrect(correct);
-
-    if (correct) {
-      setScore((s) => s + 1);
-      setStreak((s) => {
-        const newStreak = s + 1;
-        if (newStreak > bestStreak) setBestStreak(newStreak);
-        return newStreak;
-      });
-    } else {
-      setStreak(0);
+  const analyzeFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|ogg|flac|aac|m4a|aiff?)$/i)) {
+      setErrorMsg("Please drop an audio file (MP3, WAV, FLAC, OGG, etc.)");
+      setDetectorState("error");
+      return;
     }
 
-    setState("feedback");
-  }, [state, selectedAnswer, currentQuestion, bestStreak]);
+    setFileName(file.name);
+    setDetectorState("loading");
+    setErrorMsg("");
 
-  // Move to next question or results
-  const nextQuestion = useCallback(() => {
-    const nextNum = questionNumber + 1;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtx = new AudioContext();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      await audioCtx.close();
 
-    if (nextNum >= QUESTIONS_PER_ROUND) {
-      // Round complete
-      const finalScore = score + (isCorrect ? 0 : 0); // Score already updated
-      // Unlock next difficulty if scored 80%+
-      if (finalScore >= 8 && difficulty < 4 && difficulty === unlockedDifficulty) {
-        setUnlockedDifficulty((d) => Math.min(4, d + 1) as Difficulty);
-      }
-      setState("results");
-    } else {
-      setQuestionNumber(nextNum);
-      setSelectedAnswer(null);
-      setIsCorrect(null);
-      setCurrentQuestion(generateQuestion());
-      setState("playing");
+      const chroma = buildChromagram(audioBuffer);
+      const detected = detectScales(chroma);
+      setResults(detected);
+      setDetectorState("results");
+    } catch {
+      setErrorMsg("Could not decode audio. Try a different file.");
+      setDetectorState("error");
     }
-  }, [questionNumber, score, isCorrect, difficulty, unlockedDifficulty, generateQuestion]);
-
-  // Auto-play scale when question changes (for scale-id mode)
-  useEffect(() => {
-    if (state === "playing" && currentQuestion?.mode === "scale-id") {
-      const timer = setTimeout(() => {
-        playScaleForQuestion();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [state, currentQuestion, playScaleForQuestion]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isPlayingRef.current = false;
-    };
   }, []);
 
-  // Menu Screen
-  if (state === "menu") {
-    return (
-      <div className="w-full max-w-3xl mx-auto space-y-6">
-        <LCDScreen accentColor={accentColor}>
-          <div className="text-center mb-6">
-            <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-60 font-mono" style={{ color: accentColor }}>
-              Training Mode
-            </div>
-            <h2 className="text-2xl font-bold tracking-wide" style={{ color: accentColor }}>
-              Scale Quiz
-            </h2>
-          </div>
+  const handleDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) analyzeFile(file);
+    },
+    [analyzeFile],
+  );
 
-          {/* Mode Selection */}
-          <div className="mb-6">
-            <div className="text-[10px] uppercase tracking-wider mb-2 opacity-50 font-mono" style={{ color: accentColor }}>
-              Quiz Type
+  const handleFileInput = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) analyzeFile(file);
+      e.target.value = "";
+    },
+    [analyzeFile],
+  );
+
+  const reset = useCallback(() => {
+    setDetectorState("idle");
+    setResults([]);
+    setFileName("");
+    setErrorMsg("");
+  }, []);
+
+  // Top results: first 5 distinct scale types, then fill to 10
+  const topResults = results.slice(0, 10);
+
+  return (
+    <div className="w-full max-w-3xl mx-auto space-y-4">
+      <LCDScreen accentColor={ACCENT}>
+        {/* Header */}
+        <div className="text-center mb-4">
+          <div
+            className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-60 font-mono"
+            style={{ color: ACCENT }}
+          >
+            Audio Analysis
+          </div>
+          <h2 className="text-2xl font-bold tracking-wide" style={{ color: ACCENT }}>
+            Scale Detector
+          </h2>
+          <p className="text-xs opacity-50 mt-1 font-mono" style={{ color: ACCENT }}>
+            Drop Ethiopian music to identify its key & scale
+          </p>
+        </div>
+
+        {/* Drop Zone */}
+        {detectorState === "idle" || detectorState === "error" ? (
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "relative flex flex-col items-center justify-center gap-3",
+              "min-h-[180px] rounded-[3px] cursor-pointer transition-all duration-200",
+              "border-2 border-dashed",
+            )}
+            style={{
+              borderColor: isDragOver ? ACCENT : `${ACCENT}40`,
+              background: isDragOver
+                ? `${ACCENT}10`
+                : "linear-gradient(145deg, rgba(6,182,212,0.03), rgba(6,182,212,0.06))",
+              boxShadow: isDragOver ? `0 0 24px ${ACCENT}20` : "none",
+            }}
+          >
+            {/* Waveform icon */}
+            <svg
+              width="48"
+              height="32"
+              viewBox="0 0 48 32"
+              fill="none"
+              style={{ opacity: isDragOver ? 1 : 0.4 }}
+            >
+              <rect x="0" y="13" width="3" height="6" rx="1.5" fill={ACCENT} />
+              <rect x="5" y="9" width="3" height="14" rx="1.5" fill={ACCENT} />
+              <rect x="10" y="4" width="3" height="24" rx="1.5" fill={ACCENT} />
+              <rect x="15" y="8" width="3" height="16" rx="1.5" fill={ACCENT} />
+              <rect x="20" y="0" width="3" height="32" rx="1.5" fill={ACCENT} />
+              <rect x="25" y="6" width="3" height="20" rx="1.5" fill={ACCENT} />
+              <rect x="30" y="10" width="3" height="12" rx="1.5" fill={ACCENT} />
+              <rect x="35" y="7" width="3" height="18" rx="1.5" fill={ACCENT} />
+              <rect x="40" y="12" width="3" height="8" rx="1.5" fill={ACCENT} />
+              <rect x="45" y="14" width="3" height="4" rx="1.5" fill={ACCENT} />
+            </svg>
+
+            <div className="text-center">
+              <div
+                className="text-sm font-mono font-bold mb-1"
+                style={{ color: isDragOver ? ACCENT : `${ACCENT}80` }}
+              >
+                {isDragOver ? "Drop to analyze" : "Drop audio file here"}
+              </div>
+              <div
+                className="text-[11px] font-mono opacity-50"
+                style={{ color: ACCENT }}
+              >
+                or click to browse · MP3, WAV, FLAC, OGG, AIFF
+              </div>
             </div>
-            <div className="flex gap-2">
-              <MPCButton
-                onClick={() => setMode("scale-id")}
-                selected={mode === "scale-id"}
-                color={accentColor}
-                className="flex-1"
+
+            {detectorState === "error" && (
+              <div
+                className="text-xs font-mono px-3 py-1.5 rounded-[2px]"
+                style={{
+                  color: "#ef4444",
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                }}
               >
-                <div className="text-xs">Scale ID</div>
-                <div className="text-[9px] opacity-60">Hear & identify</div>
-              </MPCButton>
-              <MPCButton
-                onClick={() => setMode("note-membership")}
-                selected={mode === "note-membership"}
-                color={accentColor}
-                className="flex-1"
+                {errorMsg}
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a,.aif,.aiff"
+              className="hidden"
+              onChange={handleFileInput}
+            />
+          </div>
+        ) : null}
+
+        {/* Loading */}
+        {detectorState === "loading" && (
+          <div className="flex flex-col items-center justify-center min-h-[180px] gap-4">
+            <div className="relative w-12 h-12">
+              <div
+                className="absolute inset-0 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: `${ACCENT}40`, borderTopColor: ACCENT }}
+              />
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-mono" style={{ color: ACCENT }}>
+                Analyzing pitch content…
+              </div>
+              <div
+                className="text-[11px] font-mono opacity-50 mt-1 max-w-[220px] truncate"
+                style={{ color: ACCENT }}
               >
-                <div className="text-xs">Note Quiz</div>
-                <div className="text-[9px] opacity-60">Find the note</div>
-              </MPCButton>
+                {fileName}
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Difficulty Selection */}
-          <div className="mb-6">
-            <div className="text-[10px] uppercase tracking-wider mb-2 opacity-50 font-mono" style={{ color: accentColor }}>
-              Difficulty
+        {/* Results */}
+        {detectorState === "results" && topResults.length > 0 && (
+          <div>
+            <div
+              className="text-[10px] uppercase tracking-wider mb-3 opacity-50 font-mono"
+              style={{ color: ACCENT }}
+            >
+              Top matches · {fileName && <span className="normal-case opacity-70">{fileName}</span>}
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {([1, 2, 3, 4] as Difficulty[]).map((d) => {
-                const isLocked = d > unlockedDifficulty;
-                const scaleCount = DIFFICULTY_SCALES[d].length;
+
+            <div className="space-y-2">
+              {topResults.map((r, idx) => {
+                const info = SCALE_INFO[r.scaleType];
+                const coveragePct = Math.round(r.coverage * 100);
+                const isTop = idx === 0;
+
                 return (
-                  <MPCButton
-                    key={d}
-                    onClick={() => !isLocked && setDifficulty(d)}
-                    selected={difficulty === d}
-                    disabled={isLocked}
-                    color={isLocked ? "#666" : accentColor}
-                    className="py-2"
-                  >
-                    <div className="text-xs">{isLocked ? "🔒" : DIFFICULTY_LABELS[d]}</div>
-                    <div className="text-[9px] opacity-60">{scaleCount} scales</div>
-                  </MPCButton>
+                  <div key={`${r.scaleType}-${r.root}`} className="space-y-1">
+                    {/* Label row */}
+                    <div className="flex items-baseline justify-between">
+                      <div className="flex items-center gap-2">
+                        {/* Rank */}
+                        <span
+                          className="text-[10px] font-mono w-4 text-right opacity-40"
+                          style={{ color: info.color }}
+                        >
+                          {idx + 1}
+                        </span>
+                        {/* Color dot */}
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{
+                            background: info.color,
+                            boxShadow: isTop ? `0 0 6px ${info.color}` : "none",
+                          }}
+                        />
+                        {/* Name */}
+                        <span
+                          className={cn(
+                            "font-mono text-sm",
+                            isTop ? "font-bold" : "font-medium opacity-80",
+                          )}
+                          style={{ color: info.color }}
+                        >
+                          {r.root} {info.name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 font-mono text-xs">
+                        {/* Coverage */}
+                        <span
+                          className="opacity-50"
+                          style={{ color: info.color }}
+                          title="Fraction of pitch energy in this scale"
+                        >
+                          {coveragePct}% match
+                        </span>
+                        {/* Relative confidence bar label */}
+                        <span
+                          className={cn("font-bold", isTop && "text-sm")}
+                          style={{
+                            color: info.color,
+                            textShadow: isTop ? `0 0 8px ${info.color}` : "none",
+                          }}
+                        >
+                          {r.relative}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bar */}
+                    <div
+                      className="relative h-[5px] rounded-full ml-6"
+                      style={{ background: `${info.color}18` }}
+                    >
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${r.relative}%`,
+                          background: isTop
+                            ? `linear-gradient(90deg, ${info.color}80, ${info.color})`
+                            : `${info.color}60`,
+                          boxShadow: isTop ? `0 0 6px ${info.color}60` : "none",
+                        }}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          </div>
 
-          {/* Start Button */}
-          <MPCButton
-            onClick={startRound}
-            color={accentColor}
-            selected
-            className="w-full py-4"
-          >
-            <div className="text-lg font-bold">Start Quiz</div>
-            <div className="text-xs opacity-70">{QUESTIONS_PER_ROUND} questions</div>
-          </MPCButton>
+            {/* Chromagram strip */}
+            <ChromagramStrip results={results.slice(0, 1)[0]} />
 
-          {/* Best streak */}
-          {bestStreak > 0 && (
-            <div className="text-center mt-4 text-xs opacity-50 font-mono" style={{ color: accentColor }}>
-              Best Streak: {bestStreak}
-            </div>
-          )}
-        </LCDScreen>
-      </div>
-    );
-  }
-
-  // Playing / Feedback Screen
-  if (state === "playing" || state === "feedback") {
-    const scaleInfo = currentQuestion?.scaleType ? SCALE_INFO[currentQuestion.scaleType] : null;
-
-    return (
-      <div className="w-full max-w-3xl mx-auto space-y-6">
-        {/* Progress & Stats */}
-        <LCDScreen accentColor={accentColor} className="py-0">
-          <div className="flex items-center gap-4 mb-3">
-            <StatDisplay label="Question" value={`${questionNumber + 1}/${QUESTIONS_PER_ROUND}`} color={accentColor} />
-            <div className="flex-1">
-              <ProgressBar current={questionNumber + 1} total={QUESTIONS_PER_ROUND} color={accentColor} />
-            </div>
-            <StatDisplay label="Score" value={score} color={accentColor} />
-            <StatDisplay label="Streak" value={streak} color={streak >= 3 ? "#22c55e" : accentColor} />
-          </div>
-        </LCDScreen>
-
-        {/* Question */}
-        <LCDScreen accentColor={accentColor}>
-          <div className="text-center mb-6">
-            {currentQuestion?.mode === "scale-id" ? (
-              <>
-                <div className="text-[10px] uppercase tracking-[0.2em] mb-2 opacity-60 font-mono" style={{ color: accentColor }}>
-                  Listen & Identify
-                </div>
-                <h3 className="text-lg font-bold mb-4" style={{ color: accentColor }}>
-                  Which scale is this?
-                </h3>
-                <MPCButton
-                  onClick={playScaleForQuestion}
-                  color={accentColor}
-                  className="mb-4"
-                >
-                  ▶ Play Again
-                </MPCButton>
-              </>
-            ) : (
-              <>
-                <div className="text-[10px] uppercase tracking-[0.2em] mb-2 opacity-60 font-mono" style={{ color: accentColor }}>
-                  {currentQuestion?.root} {scaleInfo?.name}
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: accentColor }}>
-                  {currentQuestion?.targetNote === "in"
-                    ? "Which note IS in this scale?"
-                    : "Which note is NOT in this scale?"}
-                </h3>
-                <div className="text-xs opacity-50 font-mono" style={{ color: accentColor }}>
-                  {scaleInfo?.intervals}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Answer Options */}
-          <div className="grid grid-cols-2 gap-3">
-            {currentQuestion?.options.map((option) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrectAnswer = option === currentQuestion.correctAnswer;
-              let correctState: boolean | null = null;
-
-              if (state === "feedback") {
-                if (isCorrectAnswer) correctState = true;
-                else if (isSelected) correctState = false;
-              }
-
-              const displayName = currentQuestion.mode === "scale-id"
-                ? SCALE_INFO[option as ScaleType]?.name || option
-                : option;
-
-              return (
-                <MPCButton
-                  key={option}
-                  onClick={() => handleAnswer(option)}
-                  color={accentColor}
-                  selected={isSelected && state === "playing"}
-                  correct={correctState}
-                  disabled={state === "feedback"}
-                  className="py-4"
-                >
-                  {displayName}
-                </MPCButton>
-              );
-            })}
-          </div>
-
-          {/* Feedback */}
-          {state === "feedback" && (
-            <div className="mt-6 text-center">
-              <div
-                className="text-lg font-bold mb-2"
-                style={{ color: isCorrect ? "#22c55e" : "#ef4444" }}
-              >
-                {isCorrect ? "Correct!" : "Incorrect"}
-              </div>
-              {!isCorrect && currentQuestion?.mode === "scale-id" && (
-                <div className="text-sm opacity-70" style={{ color: accentColor }}>
-                  It was {SCALE_INFO[currentQuestion.correctAnswer as ScaleType]?.name}
-                </div>
-              )}
-              {!isCorrect && currentQuestion?.mode === "note-membership" && (
-                <div className="text-sm opacity-70" style={{ color: accentColor }}>
-                  The answer was {currentQuestion.correctAnswer}
-                </div>
-              )}
-              <MPCButton
-                onClick={nextQuestion}
-                color={accentColor}
-                selected
-                className="mt-4"
-              >
-                {questionNumber + 1 >= QUESTIONS_PER_ROUND ? "See Results" : "Next Question"}
-              </MPCButton>
-            </div>
-          )}
-        </LCDScreen>
-      </div>
-    );
-  }
-
-  // Results Screen
-  if (state === "results") {
-    const percentage = Math.round((score / QUESTIONS_PER_ROUND) * 100);
-    const passed = percentage >= 80;
-    const unlockedNew = passed && difficulty < 4 && difficulty === unlockedDifficulty - 1;
-
-    let message = "";
-    if (percentage === 100) message = "Perfect!";
-    else if (percentage >= 80) message = "Excellent!";
-    else if (percentage >= 60) message = "Good job!";
-    else if (percentage >= 40) message = "Keep practicing!";
-    else message = "Try again!";
-
-    return (
-      <div className="w-full max-w-3xl mx-auto space-y-6">
-        <LCDScreen accentColor={accentColor}>
-          <div className="text-center py-4">
-            <div className="text-[10px] uppercase tracking-[0.2em] mb-1 opacity-60 font-mono" style={{ color: accentColor }}>
-              Round Complete
-            </div>
-            <h2 className="text-3xl font-bold mb-6" style={{ color: accentColor }}>
-              {message}
-            </h2>
-
-            <div className="flex justify-center gap-8 mb-6">
-              <StatDisplay label="Score" value={`${score}/${QUESTIONS_PER_ROUND}`} color={accentColor} />
-              <StatDisplay label="Accuracy" value={`${percentage}%`} color={percentage >= 80 ? "#22c55e" : accentColor} />
-              <StatDisplay label="Best Streak" value={bestStreak} color={bestStreak >= 5 ? "#22c55e" : accentColor} />
-            </div>
-
-            {unlockedNew && (
-              <div
-                className="mb-6 py-3 px-4 rounded-lg text-center"
+            {/* Reset button */}
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={reset}
+                className="px-4 py-2 rounded-[3px] font-mono text-xs transition-all hover:translate-y-[1px] active:translate-y-[2px]"
                 style={{
-                  background: `${accentColor}20`,
-                  border: `1px solid ${accentColor}40`,
+                  background: `${ACCENT}20`,
+                  border: `1px solid ${ACCENT}40`,
+                  color: ACCENT,
                 }}
               >
-                <div className="text-sm font-bold" style={{ color: "#22c55e" }}>
-                  🎉 New Difficulty Unlocked!
-                </div>
-                <div className="text-xs opacity-70" style={{ color: accentColor }}>
-                  {DIFFICULTY_LABELS[unlockedDifficulty]} mode is now available
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-center">
-              <MPCButton onClick={startRound} color={accentColor} selected className="px-6">
-                Play Again
-              </MPCButton>
-              <MPCButton onClick={() => setState("menu")} color={accentColor} className="px-6">
-                Menu
-              </MPCButton>
+                Analyze another file
+              </button>
             </div>
           </div>
-        </LCDScreen>
-      </div>
-    );
-  }
+        )}
+      </LCDScreen>
 
-  return null;
+      {/* Info card */}
+      {detectorState === "idle" && (
+        <LCDScreen accentColor={ACCENT}>
+          <div className="text-[10px] uppercase tracking-wider mb-2 opacity-40 font-mono" style={{ color: ACCENT }}>
+            How it works
+          </div>
+          <p className="text-xs leading-relaxed opacity-60 font-mono" style={{ color: ACCENT }}>
+            The detector builds a <strong className="opacity-90">chromagram</strong> — a pitch-class profile — by
+            running FFT analysis across the audio and summing spectral energy into 12 semitone
+            bins. Each of the 84 Ethiopian scale variants (7 scales × 12 roots) is scored by how
+            much of the audio&apos;s energy falls within its notes. Results are ranked by confidence.
+          </p>
+        </LCDScreen>
+      )}
+    </div>
+  );
 }
 
-// Utility: Shuffle array
-function shuffleArray<T>(array: T[]): T[] {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
+// ─── Chromagram strip visualizer ─────────────────────────────────────────────
+function ChromagramStrip({ results }: { results: DetectionResult | undefined }) {
+  if (!results) return null;
+  const info = SCALE_INFO[results.scaleType];
+  const scaleNotes = getScaleNotes(results.scaleType, results.root);
+  const scalePCs = new Set(scaleNotes.map((n) => NOTE_TO_PC[n]));
+
+  const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+  return (
+    <div className="mt-4 pt-3" style={{ borderTop: `1px solid ${ACCENT}15` }}>
+      <div
+        className="text-[10px] uppercase tracking-wider mb-2 opacity-40 font-mono"
+        style={{ color: ACCENT }}
+      >
+        Top match notes · {results.root} {info.name}
+      </div>
+      <div className="flex gap-1">
+        {NOTE_NAMES.map((name, pc) => {
+          const inScale = scalePCs.has(pc);
+          const isRoot = name === results.root;
+          return (
+            <div
+              key={pc}
+              className="flex-1 flex flex-col items-center gap-1"
+            >
+              <div
+                className="w-full h-[28px] rounded-[2px] flex items-center justify-center"
+                style={{
+                  background: inScale
+                    ? isRoot
+                      ? info.color
+                      : `${info.color}50`
+                    : `${ACCENT}08`,
+                  border: `1px solid ${inScale ? info.color : `${ACCENT}20`}`,
+                  boxShadow: isRoot ? `0 0 8px ${info.color}80` : "none",
+                }}
+              >
+                <span
+                  className="text-[9px] font-mono font-bold leading-none"
+                  style={{
+                    color: inScale ? (isRoot ? "#fff" : info.color) : `${ACCENT}30`,
+                    textShadow: isRoot ? `0 0 6px ${info.color}` : "none",
+                  }}
+                >
+                  {name.replace("#", "♯")}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

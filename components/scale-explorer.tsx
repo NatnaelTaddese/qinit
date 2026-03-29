@@ -339,7 +339,7 @@ export function ScaleExplorer({
 
       {/* Quiz Mode */}
       {activeTab === "quiz" && (
-        <Quiz onPlayNote={onPlayNote} onStopNote={onStopNote} />
+        <Quiz />
       )}
 
       {/* Root Note Selector */}
