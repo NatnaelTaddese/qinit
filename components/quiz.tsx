@@ -12,23 +12,36 @@ import {
 
 // Pitch class (0–11) for each note name
 const NOTE_TO_PC: Record<string, number> = {
-  C: 0, "C#": 1, D: 2, "D#": 3, E: 4, F: 5,
-  "F#": 6, G: 7, "G#": 8, A: 9, "A#": 10, B: 11,
+  C: 0,
+  "C#": 1,
+  D: 2,
+  "D#": 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  G: 7,
+  "G#": 8,
+  A: 9,
+  "A#": 10,
+  B: 11,
 };
 
 const ALL_SCALE_TYPES: ScaleType[] = [
-  "tizita-major", "tizita-minor",
-  "bati-major", "bati-minor",
-  "ambassel-major", "ambassel-minor",
+  "tizita-major",
+  "tizita-minor",
+  "bati-major",
+  "bati-minor",
+  "ambassel-major",
+  "ambassel-minor",
   "anchihoye",
 ];
 
 interface DetectionResult {
   scaleType: ScaleType;
   root: RootNote;
-  coverage: number;    // raw in-scale energy fraction (0–1), for display
-  score: number;       // penalized score: 0 = flat chroma, 1 = perfect match
-  relative: number;    // score relative to top result (0–100)
+  coverage: number; // raw in-scale energy fraction (0–1), for display
+  score: number; // penalized score: 0 = flat chroma, 1 = perfect match
+  relative: number; // score relative to top result (0–100)
 }
 
 type DetectorState = "idle" | "loading" | "results" | "error";
@@ -53,7 +66,7 @@ function LCDScreen({
         className,
       )}
     >
-      <div className="rounded-[2px] bg-gradient-to-b from-zinc-950 to-zinc-900 p-[2px]">
+      <div className="rounded-[2px] bg-linear-to-b from-zinc-950 to-zinc-900 p-0.5">
         <div
           className="relative rounded-[1px] p-4"
           style={{
@@ -72,7 +85,8 @@ function LCDScreen({
           <div
             className="absolute inset-0 pointer-events-none rounded-[1px]"
             style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
             }}
           />
           <div className="relative z-10">{children}</div>
@@ -91,8 +105,12 @@ function fft(re: Float64Array, im: Float64Array): void {
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
     if (i < j) {
-      let t = re[i]; re[i] = re[j]; re[j] = t;
-      t = im[i]; im[i] = im[j]; im[j] = t;
+      let t = re[i];
+      re[i] = re[j];
+      re[j] = t;
+      t = im[i];
+      im[i] = im[j];
+      im[j] = t;
     }
   }
   // butterfly stages
@@ -102,9 +120,11 @@ function fft(re: Float64Array, im: Float64Array): void {
     const dwr = Math.cos(ang);
     const dwi = Math.sin(ang);
     for (let i = 0; i < n; i += len) {
-      let wr = 1, wi = 0;
+      let wr = 1,
+        wi = 0;
       for (let j = 0; j < half; j++) {
-        const ur = re[i + j], ui = im[i + j];
+        const ur = re[i + j],
+          ui = im[i + j];
         const vr = re[i + j + half] * wr - im[i + j + half] * wi;
         const vi = re[i + j + half] * wi + im[i + j + half] * wr;
         re[i + j] = ur + vr;
@@ -148,14 +168,17 @@ function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
   const start = Math.floor(len * 0.05);
   const end = Math.floor(len * 0.95);
   const available = end - start - FFT_SIZE;
-  const FRAMES = Math.max(1, Math.min(200, Math.floor(available / (FFT_SIZE / 4))));
+  const FRAMES = Math.max(
+    1,
+    Math.min(200, Math.floor(available / (FFT_SIZE / 4))),
+  );
   const step = Math.max(1, Math.floor(available / FRAMES));
 
   const re = new Float64Array(FFT_SIZE);
   const im = new Float64Array(FFT_SIZE);
 
-  const minBin = Math.max(1, Math.floor((55 * FFT_SIZE) / sr));  // ~A1 (55 Hz)
-  const maxBin = Math.ceil((4200 * FFT_SIZE) / sr);              // ~C8
+  const minBin = Math.max(1, Math.floor((55 * FFT_SIZE) / sr)); // ~A1 (55 Hz)
+  const maxBin = Math.ceil((4200 * FFT_SIZE) / sr); // ~C8
 
   // Silence gate: skip frames whose RMS is below 0.5% of full scale
   const SILENCE_THRESHOLD = 0.005;
@@ -190,8 +213,7 @@ function buildChromagram(audioBuffer: AudioBuffer): Float64Array {
   // L1-normalize so chroma sums to 1
   let total = 0;
   for (let i = 0; i < 12; i++) total += chroma[i];
-  if (total > 0)
-    for (let i = 0; i < 12; i++) chroma[i] /= total;
+  if (total > 0) for (let i = 0; i < 12; i++) chroma[i] /= total;
 
   return chroma;
 }
@@ -247,7 +269,10 @@ export function Quiz() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const analyzeFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|ogg|flac|aac|m4a|aiff?)$/i)) {
+    if (
+      !file.type.startsWith("audio/") &&
+      !file.name.match(/\.(mp3|wav|ogg|flac|aac|m4a|aiff?)$/i)
+    ) {
       setErrorMsg("Please drop an audio file (MP3, WAV, FLAC, OGG, etc.)");
       setDetectorState("error");
       return;
@@ -313,10 +338,16 @@ export function Quiz() {
           >
             Audio Analysis
           </div>
-          <h2 className="text-2xl font-bold tracking-wide" style={{ color: ACCENT }}>
+          <h2
+            className="text-2xl font-bold tracking-wide"
+            style={{ color: ACCENT }}
+          >
             Scale Detector
           </h2>
-          <p className="text-xs opacity-50 mt-1 font-mono" style={{ color: ACCENT }}>
+          <p
+            className="text-xs opacity-50 mt-1 font-mono"
+            style={{ color: ACCENT }}
+          >
             Drop Ethiopian music to identify its key & scale
           </p>
         </div>
@@ -324,7 +355,10 @@ export function Quiz() {
         {/* Drop Zone - hardware input style */}
         {detectorState === "idle" || detectorState === "error" ? (
           <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
@@ -344,13 +378,16 @@ export function Quiz() {
             }}
           >
             {/* Hardware bezel effect */}
-            <div className="absolute inset-0 rounded-md pointer-events-none" style={{ boxShadow: `inset 0 0 0 1px ${ACCENT}15` }} />
+            <div
+              className="absolute inset-0 rounded-md pointer-events-none"
+              style={{ boxShadow: `inset 0 0 0 1px ${ACCENT}15` }}
+            />
 
             {/* LED indicator */}
             <div
               className={cn(
                 "w-3 h-3 rounded-full transition-all duration-300",
-                isDragOver && "animate-pulse"
+                isDragOver && "animate-pulse",
               )}
               style={{
                 background: isDragOver
@@ -370,16 +407,136 @@ export function Quiz() {
               fill="none"
               style={{ opacity: isDragOver ? 1 : 0.5 }}
             >
-              <rect x="0" y="13" width="3" height="6" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="5" y="9" width="3" height="14" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="10" y="4" width="3" height="24" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="15" y="8" width="3" height="16" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="20" y="0" width="3" height="32" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="25" y="6" width="3" height="20" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="30" y="10" width="3" height="12" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="35" y="7" width="3" height="18" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="40" y="12" width="3" height="8" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
-              <rect x="45" y="14" width="3" height="4" rx="1" fill={ACCENT} style={{ filter: isDragOver ? `drop-shadow(0 0 4px ${ACCENT})` : 'none' }} />
+              <rect
+                x="0"
+                y="13"
+                width="3"
+                height="6"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="5"
+                y="9"
+                width="3"
+                height="14"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="10"
+                y="4"
+                width="3"
+                height="24"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="15"
+                y="8"
+                width="3"
+                height="16"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="20"
+                y="0"
+                width="3"
+                height="32"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="25"
+                y="6"
+                width="3"
+                height="20"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="30"
+                y="10"
+                width="3"
+                height="12"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="35"
+                y="7"
+                width="3"
+                height="18"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="40"
+                y="12"
+                width="3"
+                height="8"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
+              <rect
+                x="45"
+                y="14"
+                width="3"
+                height="4"
+                rx="1"
+                fill={ACCENT}
+                style={{
+                  filter: isDragOver
+                    ? `drop-shadow(0 0 4px ${ACCENT})`
+                    : "none",
+                }}
+              />
             </svg>
 
             <div className="text-center">
@@ -387,7 +544,7 @@ export function Quiz() {
                 className="text-sm font-mono font-bold mb-1"
                 style={{
                   color: isDragOver ? ACCENT : `${ACCENT}80`,
-                  textShadow: isDragOver ? `0 0 10px ${ACCENT}80` : 'none',
+                  textShadow: isDragOver ? `0 0 10px ${ACCENT}80` : "none",
                 }}
               >
                 {isDragOver ? "Drop to analyze" : "Drop audio file here"}
@@ -410,7 +567,10 @@ export function Quiz() {
                   textShadow: "0 0 8px rgba(239,68,68,0.5)",
                 }}
               >
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" style={{ boxShadow: '0 0 6px #ef4444' }} />
+                <span
+                  className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+                  style={{ boxShadow: "0 0 6px #ef4444" }}
+                />
                 {errorMsg}
               </div>
             )}
@@ -433,7 +593,13 @@ export function Quiz() {
               {/* Outer bezel */}
               <div className="rounded-md p-1 bg-gradient-to-b from-zinc-700 to-zinc-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.5)]">
                 {/* Inner display */}
-                <div className="relative w-16 h-16 rounded-sm overflow-hidden" style={{ backgroundColor: `${ACCENT}08`, boxShadow: `inset 0 0 20px rgba(0,0,0,0.5)` }}>
+                <div
+                  className="relative w-16 h-16 rounded-sm overflow-hidden"
+                  style={{
+                    backgroundColor: `${ACCENT}08`,
+                    boxShadow: `inset 0 0 20px rgba(0,0,0,0.5)`,
+                  }}
+                >
                   {/* Scanning line effect */}
                   <div className="absolute inset-0 animate-pulse bg-gradient-to-b from-transparent via-cyan-500/10 to-transparent" />
                   {/* LED dots */}
@@ -464,12 +630,24 @@ export function Quiz() {
 
             <div className="text-center">
               {/* Retro text with glow */}
-              <div className="text-sm font-mono" style={{ color: ACCENT, textShadow: `0 0 10px ${ACCENT}80, 0 0 20px ${ACCENT}40` }}>
+              <div
+                className="text-sm font-mono"
+                style={{
+                  color: ACCENT,
+                  textShadow: `0 0 10px ${ACCENT}80, 0 0 20px ${ACCENT}40`,
+                }}
+              >
                 Analyzing pitch content
               </div>
               {/* Blinking cursor */}
-              <span className="inline-block w-2 h-3 ml-0.5 animate-pulse" style={{ background: ACCENT }} />
-              <div className="text-[11px] font-mono mt-1 max-w-[220px] truncate" style={{ color: ACCENT, opacity: 0.5 }}>
+              <span
+                className="inline-block w-2 h-3 ml-0.5 animate-pulse"
+                style={{ background: ACCENT }}
+              />
+              <div
+                className="text-[11px] font-mono mt-1 max-w-[220px] truncate"
+                style={{ color: ACCENT, opacity: 0.5 }}
+              >
                 {fileName}
               </div>
             </div>
@@ -483,7 +661,10 @@ export function Quiz() {
               className="text-[10px] uppercase tracking-wider mb-3 opacity-50 font-mono"
               style={{ color: ACCENT }}
             >
-              Top matches · {fileName && <span className="normal-case opacity-70">{fileName}</span>}
+              Top matches ·{" "}
+              {fileName && (
+                <span className="normal-case opacity-70">{fileName}</span>
+              )}
             </div>
 
             {/* Results display - hardware LED meter style */}
@@ -501,18 +682,28 @@ export function Quiz() {
                     className={cn(
                       "relative rounded-md p-2 overflow-hidden transition-all duration-300 border",
                       isTop3 ? "opacity-100" : "opacity-50",
-                      isFirst ? "shadow-[0_0_25px_var(--tw-shadow-color)]" : isTop3 ? "shadow-[0_0_15px_var(--tw-shadow-color)]" : "shadow-none",
+                      isFirst
+                        ? "shadow-[0_0_25px_var(--tw-shadow-color)]"
+                        : isTop3
+                          ? "shadow-[0_0_15px_var(--tw-shadow-color)]"
+                          : "shadow-none",
                     )}
-                    style={{
-                      backgroundColor: isTop3 ? `${info.color}10` : `${info.color}04`,
-                      borderColor: isTop3 ? `${info.color}` : `${info.color}30`,
-                      boxShadow: isFirst 
-                        ? `0 0 25px ${info.color}20, inset 0 0 40px ${info.color}10`
-                        : isTop3 
-                          ? `0 0 15px ${info.color}10`
-                          : 'none',
-                      '--tw-shadow-color': info.color,
-                    } as React.CSSProperties}
+                    style={
+                      {
+                        backgroundColor: isTop3
+                          ? `${info.color}10`
+                          : `${info.color}04`,
+                        borderColor: isTop3
+                          ? `${info.color}`
+                          : `${info.color}30`,
+                        boxShadow: isFirst
+                          ? `0 0 25px ${info.color}20, inset 0 0 40px ${info.color}10`
+                          : isTop3
+                            ? `0 0 15px ${info.color}10`
+                            : "none",
+                        "--tw-shadow-color": info.color,
+                      } as React.CSSProperties
+                    }
                   >
                     {/* CRT scanline effect on each row */}
                     <div className="absolute inset-0 pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSJ0cmFuc3BhcmVudCIvPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSIxIiBmaWxsPSJibGFjayIgb3BhY2l0eT0iMC4zIi8+Cjwvc3ZnPg==')]" />
@@ -548,7 +739,9 @@ export function Quiz() {
                           )}
                           style={{
                             color: info.color,
-                            textShadow: isTop3 ? `0 0 12px ${info.color}80` : "none",
+                            textShadow: isTop3
+                              ? `0 0 12px ${info.color}80`
+                              : "none",
                           }}
                         >
                           {r.root} {info.name}
@@ -584,8 +777,12 @@ export function Quiz() {
                               : `${info.color}10`,
                             border: `1px solid ${info.color}${isTop3 ? "60" : "30"}`,
                             color: info.color,
-                            textShadow: isTop3 ? `0 0 8px ${info.color}` : "none",
-                            boxShadow: isTop3 ? `inset 0 0 10px ${info.color}20` : "none",
+                            textShadow: isTop3
+                              ? `0 0 8px ${info.color}`
+                              : "none",
+                            boxShadow: isTop3
+                              ? `inset 0 0 10px ${info.color}20`
+                              : "none",
                           }}
                         >
                           {scorePct}%
@@ -606,9 +803,17 @@ export function Quiz() {
                         let segmentColor = `${info.color}20`;
                         if (active) {
                           if (isTop3) {
-                            segmentColor = isHigh ? info.color : isMid ? `${info.color}cc` : `${info.color}99`;
+                            segmentColor = isHigh
+                              ? info.color
+                              : isMid
+                                ? `${info.color}cc`
+                                : `${info.color}99`;
                           } else {
-                            segmentColor = isHigh ? `${info.color}aa` : isMid ? `${info.color}77` : `${info.color}55`;
+                            segmentColor = isHigh
+                              ? `${info.color}aa`
+                              : isMid
+                                ? `${info.color}77`
+                                : `${info.color}55`;
                           }
                         }
 
@@ -618,9 +823,10 @@ export function Quiz() {
                             className="h-2 flex-1 rounded-sm transition-all duration-300"
                             style={{
                               background: segmentColor,
-                              boxShadow: active && isTop3
-                                ? `0 0 4px ${info.color}60`
-                                : "none",
+                              boxShadow:
+                                active && isTop3
+                                  ? `0 0 4px ${info.color}60`
+                                  : "none",
                             }}
                           />
                         );
@@ -670,15 +876,26 @@ export function Quiz() {
       {/* Info card */}
       {detectorState === "idle" && (
         <LCDScreen accentColor={ACCENT}>
-          <div className="text-[10px] uppercase tracking-wider mb-2 opacity-40 font-mono" style={{ color: ACCENT }}>
+          <div
+            className="text-[10px] uppercase tracking-wider mb-2 opacity-40 font-mono"
+            style={{ color: ACCENT }}
+          >
             How it works
           </div>
-          <p className="text-xs leading-relaxed opacity-60 font-mono" style={{ color: ACCENT }}>
-            Builds an <strong className="opacity-90">energy-weighted chromagram</strong> via FFT — each frame&apos;s
-            spectral energy is weighted by its RMS, so loud frames dominate and silence is ignored.
-            Each of the 84 variants (7 scales × 12 roots) is scored as{" "}
-            <strong className="opacity-90">in_energy − (5/7) × out_energy</strong>, which penalises
-            off-note energy and normalises so a flat spectrum scores 0 and a perfect match scores 100%.
+          <p
+            className="text-xs leading-relaxed opacity-60 font-mono"
+            style={{ color: ACCENT }}
+          >
+            Builds an{" "}
+            <strong className="opacity-90">energy-weighted chromagram</strong>{" "}
+            via FFT — each frame&apos;s spectral energy is weighted by its RMS,
+            so loud frames dominate and silence is ignored. Each of the 84
+            variants (7 scales × 12 roots) is scored as{" "}
+            <strong className="opacity-90">
+              in_energy − (5/7) × out_energy
+            </strong>
+            , which penalises off-note energy and normalises so a flat spectrum
+            scores 0 and a perfect match scores 100%.
           </p>
         </LCDScreen>
       )}
@@ -687,28 +904,58 @@ export function Quiz() {
 }
 
 // ─── Chromagram strip visualizer ─────────────────────────────────────────────
-function ChromagramStrip({ results }: { results: DetectionResult | undefined }) {
+function ChromagramStrip({
+  results,
+}: {
+  results: DetectionResult | undefined;
+}) {
   if (!results) return null;
   const info = SCALE_INFO[results.scaleType];
   const scaleNotes = getScaleNotes(results.scaleType, results.root);
   const scalePCs = new Set(scaleNotes.map((n) => NOTE_TO_PC[n]));
 
-  const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const NOTE_NAMES = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
 
   return (
     <div className="mt-4 pt-3 border-t" style={{ borderColor: `${ACCENT}15` }}>
       {/* Retro LCD display header */}
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] uppercase tracking-wider font-mono" style={{ color: ACCENT, opacity: 0.4 }}>
+        <div
+          className="text-[10px] uppercase tracking-wider font-mono"
+          style={{ color: ACCENT, opacity: 0.4 }}
+        >
           Top match notes
         </div>
-        <div className="text-[10px] font-mono font-bold" style={{ color: info.color, textShadow: `0 0 8px ${info.color}` }}>
+        <div
+          className="text-[10px] font-mono font-bold"
+          style={{ color: info.color, textShadow: `0 0 8px ${info.color}` }}
+        >
           {results.root} {info.name}
         </div>
       </div>
 
       {/* Hardware LED display style */}
-      <div className="rounded-md p-2 border" style={{ backgroundColor: `${ACCENT}05`, borderColor: `${ACCENT}15`, boxShadow: `inset 0 0 20px rgba(0,0,0,0.3)` }}>
+      <div
+        className="rounded-md p-2 border"
+        style={{
+          backgroundColor: `${ACCENT}05`,
+          borderColor: `${ACCENT}15`,
+          boxShadow: `inset 0 0 20px rgba(0,0,0,0.3)`,
+        }}
+      >
         {/* CRT effect overlay */}
         <div className="absolute inset-0 pointer-events-none rounded-md bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSJ0cmFuc3BhcmVudCIvPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSIxIiBmaWxsPSJibGFjayIgb3BhY2l0eT0iMC4zIi8+Cjwvc3ZnPg==')]" />
 
@@ -739,7 +986,9 @@ function ChromagramStrip({ results }: { results: DetectionResult | undefined }) 
                     className="text-[9px] font-mono font-bold leading-none"
                     style={{
                       color: inScale ? (isRoot ? "#fff" : info.color) : "#333",
-                      textShadow: isRoot ? `0 0 8px ${info.color}, 0 0 12px ${info.color}` : "none",
+                      textShadow: isRoot
+                        ? `0 0 8px ${info.color}, 0 0 12px ${info.color}`
+                        : "none",
                     }}
                   >
                     {name.replace("#", "♯")}
@@ -760,8 +1009,14 @@ function ChromagramStrip({ results }: { results: DetectionResult | undefined }) 
                 <div
                   className="w-1.5 h-1.5 rounded-full"
                   style={{
-                    background: inScale ? (isRoot ? info.color : `${info.color}80`) : "#222",
-                    boxShadow: inScale ? `0 0 4px ${info.color}` : `inset 0 1px 2px rgba(0,0,0,0.5)`,
+                    background: inScale
+                      ? isRoot
+                        ? info.color
+                        : `${info.color}80`
+                      : "#222",
+                    boxShadow: inScale
+                      ? `0 0 4px ${info.color}`
+                      : `inset 0 1px 2px rgba(0,0,0,0.5)`,
                   }}
                 />
               </div>
