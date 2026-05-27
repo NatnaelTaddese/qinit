@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { PianoKeyboard } from "@/components/piano-keyboard";
 import { ScaleExplorer } from "@/components/scale-explorer";
 import { ScaleNavbar, TabType } from "@/components/scale-navbar";
@@ -10,6 +11,7 @@ import {
   ScaleVariant,
   RootNote,
   ScaleCategory,
+  SCALE_CATEGORIES,
   getScaleType,
   hasVariants,
 } from "@/lib/scales";
@@ -20,13 +22,31 @@ function midiNoteToFrequency(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
 
+const ROUTE_TABS: TabType[] = [
+  "kinit",
+  ...SCALE_CATEGORIES.map((category) => category.id),
+  "quiz",
+];
+
+function getTabFromPathname(pathname: string): TabType {
+  const segment = pathname.split("/").filter(Boolean)[0];
+
+  if (segment && ROUTE_TABS.includes(segment as TabType)) {
+    return segment as TabType;
+  }
+
+  return "tizita";
+}
+
 export default function Home() {
   const [isKeyboardCollapsed, setIsKeyboardCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>("tizita");
   const [variant, setVariant] = useState<ScaleVariant>("major");
   const [selectedRoot, setSelectedRoot] = useState<RootNote>("C#");
   const [playbackNotes, setPlaybackNotes] = useState<Set<number>>(new Set());
 
+  const pathname = usePathname();
+  const router = useRouter();
+  const activeTab = useMemo(() => getTabFromPathname(pathname), [pathname]);
   const { initAudio, playNote, stopNote } = useAudio();
 
   // Compute selectedScale from activeTab and variant
@@ -39,8 +59,8 @@ export default function Home() {
   }, [activeTab, variant]);
 
   const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-  }, []);
+    router.push(`/${tab}`);
+  }, [router]);
 
   const handleVariantChange = useCallback((newVariant: ScaleVariant) => {
     setVariant(newVariant);

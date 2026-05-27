@@ -11,7 +11,7 @@ import {
   hasVariants,
 } from "@/lib/scales";
 
-type TabType = "kinit" | ScaleCategory | "quiz";
+export type TabType = "kinit" | ScaleCategory | "quiz";
 
 interface ScaleNavbarProps {
   activeTab: TabType;
@@ -219,8 +219,6 @@ function VariantButton({
     </button>
   );
 }
-
-export type { TabType };
 
 // Logo Button Component - White piano key style
 function LogoButton() {
